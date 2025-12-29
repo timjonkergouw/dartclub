@@ -3,14 +3,11 @@
 :root {
   --background: #0A294F;
   --foreground: #000000;
-  --button-bg: #E8F0FF;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 body {

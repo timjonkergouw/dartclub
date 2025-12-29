@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DartClub
 
-## Getting Started
+Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 en het bijhouden van dart statistieken.
 
-First, run the development server:
+## Beschrijving
 
+DartClub is een responsive web applicatie speciaal ontworpen voor smartphones. De app biedt verschillende functionaliteiten voor dartspelers, waaronder het spelen van 501 (normaal en borrelmodus), het bekijken van statistieken, achievements en professionele uitslagen.
+
+## Technologieën
+
+- **Next.js 15** - React framework met App Router
+- **TypeScript** - Type-safe JavaScript
+- **Tailwind CSS 4** - Utility-first CSS framework
+- **Gilroy Font** - Modern lettertype voor de interface
+
+## Design
+
+- **Achtergrondkleur**: #0A294F (donkerblauw)
+- **Knoppenkleur**: #E8F0FF (lichtblauw)
+- **Tekstkleur**: #000000 (zwart)
+- **Subtekstkleur**: #7E838F (grijs)
+- **Mobile-first** design met grote touch targets
+- **Material Design** principes
+
+## Functies
+
+- 🎯 **Speel 501** - Normaal 501 spelen
+- 🍺 **Speel 501 Borrelmodus** - Met vrienden en drankregels
+- 📊 **Statistieken** - Bekijk je dart statistieken
+- 🏆 **Achievements** - Bekijk je Achievements en Badges
+- 📺 **Uitslagen Profs** - Bekijk de uitslagen van de profs
+
+## Installatie
+
+1. Clone de repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd dartclub
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Installeer dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Start de development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3000](http://localhost:3000) in je browser.
 
-## Learn More
+## Project Structuur
 
-To learn more about Next.js, take a look at the following resources:
+```
+dartclub/
+├── app/
+│   ├── components/
+│   │   ├── FontLoader.tsx      # Gilroy font loader
+│   │   └── HamburgerMenu.tsx   # Side menu component
+│   ├── globals.css             # Global styles
+│   ├── layout.tsx              # Root layout
+│   └── page.tsx                # Home pagina
+├── public/                     # Statische assets (logo's, iconen)
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `npm run dev` - Start development server
+- `npm run build` - Build voor productie
+- `npm start` - Start productie server
+- `npm run lint` - Run ESLint
 
-## Deploy on Vercel
+## Licentie
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[Voeg licentie-informatie toe]

@@ -59,12 +59,11 @@ export default function HamburgerMenu({ items }: HamburgerMenuProps) {
         </div>
       </button>
 
-      {/* Overlay - alleen achter het menu, niet over de content */}
+      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-[#0A294F] bg-opacity-50 z-30 transition-opacity duration-300 pointer-events-auto"
           onClick={toggleMenu}
-          style={{ zIndex: 30 }}
         />
       )}
 
