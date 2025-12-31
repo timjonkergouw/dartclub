@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface MenuItem {
   text: string;
@@ -75,32 +76,58 @@ export default function HamburgerMenu({ items }: HamburgerMenuProps) {
       >
         <div className="flex flex-col h-full pt-20 pb-6 px-4 overflow-y-auto">
           <div className="space-y-3">
-            {items.map((item, index) => (
-              <button
-                key={index}
-                onClick={toggleMenu}
-                className="w-full bg-[#0A294F] text-white py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:bg-[#0d3a6a] touch-manipulation flex items-center gap-3"
-                style={{
-                  minHeight: "64px",
-                }}
-              >
-                <Image
-                  src={getWhiteIcon(item.icon)}
-                  alt={item.text}
-                  width={44}
-                  height={44}
-                  className="shrink-0"
-                />
-                <div className="flex flex-col items-start justify-center gap-0.5">
-                  <span className="text-left font-semibold text-lg leading-tight">
-                    {item.text}
-                  </span>
-                  <span className="text-left text-xs leading-tight" style={{ color: "#7E838F" }}>
-                    {item.subtext}
-                  </span>
-                </div>
-              </button>
-            ))}
+            {items.map((item, index) => {
+              const MenuContent = (
+                <>
+                  <Image
+                    src={getWhiteIcon(item.icon)}
+                    alt={item.text}
+                    width={44}
+                    height={44}
+                    className="shrink-0"
+                  />
+                  <div className="flex flex-col items-start justify-center gap-0.5">
+                    <span className="text-left font-semibold text-lg leading-tight">
+                      {item.text}
+                    </span>
+                    <span className="text-left text-xs leading-tight" style={{ color: "#7E838F" }}>
+                      {item.subtext}
+                    </span>
+                  </div>
+                </>
+              );
+
+              // Link voor "Speel 501"
+              if (item.text === "Speel 501") {
+                return (
+                  <Link
+                    key={index}
+                    href="/speel-501"
+                    onClick={toggleMenu}
+                    className="w-full bg-[#0A294F] text-white py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:bg-[#0d3a6a] touch-manipulation flex items-center gap-3"
+                    style={{
+                      minHeight: "64px",
+                    }}
+                  >
+                    {MenuContent}
+                  </Link>
+                );
+              }
+
+              // Normale button voor andere items
+              return (
+                <button
+                  key={index}
+                  onClick={toggleMenu}
+                  className="w-full bg-[#0A294F] text-white py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:bg-[#0d3a6a] touch-manipulation flex items-center gap-3"
+                  style={{
+                    minHeight: "64px",
+                  }}
+                >
+                  {MenuContent}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
