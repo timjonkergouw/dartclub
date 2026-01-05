@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
   createInitialStats,
   registerTurn,
+  registerDoubleAttempt,
   calculateFinalStats,
   type DartStats,
 } from "@/lib/dartlogic";
 import { supabase } from "@/lib/supabase";
+import { calculateCheckoutInfo, getMinDartsOnDouble, getMaxDartsOnDouble } from "@/lib/checkout";
 
 interface Player {
   id: number;
@@ -22,6 +24,7 @@ interface PlayerGameState {
   score: number;
   totalScore: number;
   totalDarts: number;
+  dartsInCurrentLeg: number;
   lastScore: number;
   turns: number;
   legsWon: number;
@@ -40,12 +43,49 @@ export default function Play501Game() {
   const [target, setTarget] = useState(1);
   const [playerStats, setPlayerStats] = useState<Map<number, DartStats>>(new Map());
   const [gameId, setGameId] = useState<string>("");
+  const [showCheckoutPopup, setShowCheckoutPopup] = useState(false);
+  const [checkoutDarts, setCheckoutDarts] = useState<1 | 2 | 3 | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{
+    score: number;
+    currentState: PlayerGameState;
+    updatedStates: PlayerGameState[];
+    updatedStats: Map<number, DartStats>;
+  } | null>(null);
+  const [legStartingPlayerIndex, setLegStartingPlayerIndex] = useState(0);
+  const [setStartingPlayerIndex, setSetStartingPlayerIndex] = useState(0);
+  const [showGameFinished, setShowGameFinished] = useState(false);
+  const [winner, setWinner] = useState<PlayerGameState | null>(null);
+  const [trackDoubles, setTrackDoubles] = useState(false);
+  const [showDoublePopup, setShowDoublePopup] = useState(false);
+  const [doubleDarts, setDoubleDarts] = useState<number | null>(null);
+  const [pendingDoubleCheckout, setPendingDoubleCheckout] = useState<{
+    score: number;
+    currentState: PlayerGameState;
+    updatedStates: PlayerGameState[];
+    updatedStats: Map<number, DartStats>;
+    possibleDartsOnDouble: number[];
+  } | null>(null);
+  const [gameHistory, setGameHistory] = useState<Array<{
+    gameStates: PlayerGameState[];
+    playerStats: Map<number, DartStats>;
+    currentPlayerIndex: number;
+    legStartingPlayerIndex: number;
+    setStartingPlayerIndex: number;
+  }>>([]);
+  const [showStartPopup, setShowStartPopup] = useState(false);
+  const [startMethod, setStartMethod] = useState<"bulls" | "wheel" | "coin" | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Player[]>([]);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [coinFlipping, setCoinFlipping] = useState(false);
+  const [coinResult, setCoinResult] = useState<"heads" | "tails" | null>(null);
 
   useEffect(() => {
     const playersParam = searchParams.get("players");
     const modeParam = searchParams.get("mode");
     const typeParam = searchParams.get("type");
     const targetParam = searchParams.get("target");
+    const trackDoublesParam = searchParams.get("trackDoubles");
 
     if (playersParam) {
       try {
@@ -54,6 +94,7 @@ export default function Play501Game() {
         setGameMode((modeParam as "first-to" | "best-of") || "first-to");
         setGameType((typeParam as "sets" | "legs") || "legs");
         setTarget(parseInt(targetParam || "1"));
+        setTrackDoubles(trackDoublesParam === "true");
 
         // Initialize game states
         const initialStates: PlayerGameState[] = parsedPlayers.map(
@@ -62,6 +103,7 @@ export default function Play501Game() {
             score: 501,
             totalScore: 0,
             totalDarts: 0,
+            dartsInCurrentLeg: 0,
             lastScore: 0,
             turns: 0,
             legsWon: 0,
@@ -79,6 +121,14 @@ export default function Play501Game() {
 
         // Generate unique game ID
         setGameId(`game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
+        // Initialize starting players
+        setLegStartingPlayerIndex(0);
+        setSetStartingPlayerIndex(0);
+        setCurrentPlayerIndex(0);
+
+        // Show start popup
+        setShowStartPopup(true);
       } catch (error) {
         console.error("Error parsing players:", error);
         router.push("/speel-501");
@@ -98,7 +148,146 @@ export default function Play501Game() {
     setInputScore(inputScore.slice(0, -1));
   };
 
-  const handleSubmit = () => {
+  const confirmDoubleCheckout = useCallback(() => {
+    if (!pendingDoubleCheckout || doubleDarts === null) return;
+
+    // Sla huidige state op in geschiedenis (voordat double checkout wordt verwerkt)
+    const currentStateCopy = gameStates.map(state => ({ ...state }));
+    const currentStatsCopy = new Map<number, DartStats>();
+    playerStats.forEach((stats, playerId) => {
+      currentStatsCopy.set(playerId, { ...stats });
+    });
+    setGameHistory(prev => [...prev, {
+      gameStates: currentStateCopy,
+      playerStats: currentStatsCopy,
+      currentPlayerIndex,
+      legStartingPlayerIndex,
+      setStartingPlayerIndex,
+    }]);
+
+    const { score, currentState, updatedStates, updatedStats, possibleDartsOnDouble } = pendingDoubleCheckout;
+    const updatedStatesCopy = [...updatedStates];
+    const updatedStatsCopy = new Map(updatedStats);
+
+    // Update stats met dubbel tracking
+    const currentPlayerId = currentState.player.id;
+    const currentPlayerStat = updatedStatsCopy.get(currentPlayerId) || createInitialStats();
+    
+    // doublesHit = 1 als de speler heeft uitgegooid (maar dat is hier niet het geval, dus 0)
+    // doublesThrown = aantal pijlen op dubbel
+    const updatedStat = registerDoubleAttempt(currentPlayerStat, doubleDarts, 0);
+    updatedStatsCopy.set(currentPlayerId, updatedStat);
+
+    // Update game state
+    updatedStatesCopy[currentPlayerIndex] = {
+      ...currentState,
+      score: currentState.score - score,
+      totalScore: currentState.totalScore + score,
+      totalDarts: currentState.totalDarts + 3,
+      dartsInCurrentLeg: currentState.dartsInCurrentLeg + 3,
+      lastScore: score,
+      turns: currentState.turns + 1,
+    };
+
+    setGameStates(updatedStatesCopy);
+    setPlayerStats(updatedStatsCopy);
+    setShowDoublePopup(false);
+    setPendingDoubleCheckout(null);
+    setDoubleDarts(null);
+    setInputScore("");
+    setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
+  }, [pendingDoubleCheckout, doubleDarts, currentPlayerIndex, players.length, gameStates, playerStats, legStartingPlayerIndex, setStartingPlayerIndex]);
+
+  const confirmCheckout = () => {
+    if (!pendingCheckout || !checkoutDarts) return;
+
+    const { score, currentState, updatedStates, updatedStats } = pendingCheckout;
+    const updatedStatesCopy = [...updatedStates];
+    const updatedStatsCopy = new Map(updatedStats);
+
+    // Update stats met dubbel tracking als trackDoubles aan staat
+    if (trackDoubles) {
+      const currentPlayerId = currentState.player.id;
+      const currentPlayerStat = updatedStatsCopy.get(currentPlayerId) || createInitialStats();
+      
+      // Bij uitgooien: doublesHit = 1 (de laatste pijl op dubbel), doublesThrown = checkoutDarts
+      // Maar we moeten alleen de laatste pijl tellen als hit, de rest als thrown
+      const updatedStat = registerDoubleAttempt(currentPlayerStat, checkoutDarts, 1);
+      updatedStatsCopy.set(currentPlayerId, updatedStat);
+    }
+
+    // Leg gewonnen - verhoog legsWon voor de winnende speler
+    const newLegsWon = currentState.legsWon + 1;
+    updatedStatesCopy[currentPlayerIndex] = {
+      ...currentState,
+      score: 501, // Reset voor volgende leg
+      totalScore: currentState.totalScore + score,
+      totalDarts: currentState.totalDarts + checkoutDarts, // Totaal darts over hele spel
+      dartsInCurrentLeg: 0, // Reset darts voor nieuwe leg
+      lastScore: score,
+      turns: 0, // Reset turns voor nieuwe leg
+      legsWon: newLegsWon,
+    };
+
+    // Reset alle spelers' scores en darts voor nieuwe leg
+    updatedStatesCopy.forEach((state, idx) => {
+      if (idx !== currentPlayerIndex) {
+        state.score = 501;
+        state.dartsInCurrentLeg = 0; // Reset darts voor nieuwe leg
+        state.turns = 0; // Reset turns voor nieuwe leg
+      }
+    });
+
+    // Een set is best-of-5: eerste tot 3 legs wint de set
+    const legsNeededForSet = 3;
+    let setWon = false;
+    let newSetStartingPlayerIndex = setStartingPlayerIndex;
+
+    // Check of deze speler de set gewonnen heeft (3 legs in de huidige set)
+    if (newLegsWon >= legsNeededForSet) {
+      // Set gewonnen!
+      updatedStatesCopy[currentPlayerIndex].setsWon += 1;
+      setWon = true;
+      
+      // Reset alle legs naar 0 voor nieuwe set
+      updatedStatesCopy.forEach((state) => {
+        state.legsWon = 0;
+      });
+
+      // Wissel startende speler voor de volgende set
+      newSetStartingPlayerIndex = (setStartingPlayerIndex + 1) % players.length;
+      setSetStartingPlayerIndex(newSetStartingPlayerIndex);
+    }
+
+    // Wissel startende speler voor de volgende leg
+    const newLegStartingPlayerIndex = (legStartingPlayerIndex + 1) % players.length;
+    setLegStartingPlayerIndex(newLegStartingPlayerIndex);
+
+    // Check if game is won (bij beide modes: eerste tot X sets)
+    const gameWon = updatedStatesCopy[currentPlayerIndex].setsWon >= target;
+
+    if (gameWon) {
+      // Game finished - save stats and show end screen
+      setWinner(updatedStatesCopy[currentPlayerIndex]);
+      finishGame(updatedStatesCopy, updatedStatsCopy);
+      setShowGameFinished(true);
+    } else if (setWon) {
+      // Nieuwe set begint - start met de nieuwe set starting player
+      setCurrentPlayerIndex(newSetStartingPlayerIndex);
+    } else {
+      // Nieuwe leg begint - start met de nieuwe leg starting player
+      setCurrentPlayerIndex(newLegStartingPlayerIndex);
+    }
+
+    setGameStates(updatedStatesCopy);
+    setPlayerStats(updatedStatsCopy);
+    setShowCheckoutPopup(false);
+    setPendingCheckout(null);
+    setCheckoutDarts(null);
+    setInputScore("");
+  };
+
+  const handleSubmit = useCallback(() => {
     if (!inputScore || inputScore === "0") return;
 
     const score = parseInt(inputScore);
@@ -108,6 +297,8 @@ export default function Play501Game() {
     }
 
     const currentState = gameStates[currentPlayerIndex];
+    if (!currentState) return;
+
     const newScore = currentState.score - score;
 
     if (newScore < 0) {
@@ -115,6 +306,20 @@ export default function Play501Game() {
       setInputScore("");
       return;
     }
+
+    // Sla huidige state op in geschiedenis voordat we wijzigen
+    const currentStateCopy = gameStates.map(state => ({ ...state }));
+    const currentStatsCopy = new Map<number, DartStats>();
+    playerStats.forEach((stats, playerId) => {
+      currentStatsCopy.set(playerId, { ...stats });
+    });
+    setGameHistory(prev => [...prev, {
+      gameStates: currentStateCopy,
+      playerStats: currentStatsCopy,
+      currentPlayerIndex,
+      legStartingPlayerIndex,
+      setStartingPlayerIndex,
+    }]);
 
     const updatedStates = [...gameStates];
 
@@ -127,61 +332,131 @@ export default function Play501Game() {
     setPlayerStats(updatedStats);
 
     if (newScore === 0) {
-      // Leg gewonnen
-      updatedStates[currentPlayerIndex] = {
-        ...currentState,
-        score: 501, // Reset voor volgende leg
-        totalScore: currentState.totalScore + score,
-        totalDarts: currentState.totalDarts + 3,
-        lastScore: score,
-        turns: currentState.turns + 1,
-        legsWon: currentState.legsWon + 1,
-      };
-
-      // Reset alle spelers' scores voor nieuwe leg
-      updatedStates.forEach((state, idx) => {
-        if (idx !== currentPlayerIndex) {
-          state.score = 501;
-        }
+      // Uitgegooid - toon popup voor aantal pijlen
+      setPendingCheckout({
+        score,
+        currentState,
+        updatedStates,
+        updatedStats,
       });
-
-      // Check if set is won (if playing sets)
-      if (gameType === "sets") {
-        const legsNeeded = Math.ceil(target / 2);
-        if (updatedStates[currentPlayerIndex].legsWon >= legsNeeded) {
-          updatedStates[currentPlayerIndex].setsWon += 1;
-          updatedStates[currentPlayerIndex].legsWon = 0;
-          // Reset all players' legs for new set
-          updatedStates.forEach((state) => {
-            state.legsWon = 0;
+      setShowCheckoutPopup(true);
+      setCheckoutDarts(null);
+      setInputScore("");
+      return;
+    } else {
+      // Check of dit een mogelijke finish was (maar niet uitgegooid)
+      if (trackDoubles) {
+        const checkoutInfo = calculateCheckoutInfo(newScore);
+        if (checkoutInfo.isPossible && checkoutInfo.possibleDartsOnDouble.length > 0) {
+          // Mogelijke finish - toon pop-up voor dubbel tracking
+          setPendingDoubleCheckout({
+            score,
+            currentState,
+            updatedStates,
+            updatedStats,
+            possibleDartsOnDouble: checkoutInfo.possibleDartsOnDouble,
           });
+          setShowDoublePopup(true);
+          setDoubleDarts(null);
+          setInputScore("");
+          return;
         }
       }
 
-      // Check if game is won
-      const gameWon = gameType === "legs"
-        ? updatedStates[currentPlayerIndex].legsWon >= target
-        : updatedStates[currentPlayerIndex].setsWon >= target;
-
-      if (gameWon) {
-        // Game finished - save stats for all players
-        finishGame(updatedStates, updatedStats);
-      }
-    } else {
       updatedStates[currentPlayerIndex] = {
         ...currentState,
         score: newScore,
         totalScore: currentState.totalScore + score,
-        totalDarts: currentState.totalDarts + 3,
+        totalDarts: currentState.totalDarts + 3, // Totaal darts over hele spel
+        dartsInCurrentLeg: currentState.dartsInCurrentLeg + 3, // Darts in huidige leg
         lastScore: score,
         turns: currentState.turns + 1,
       };
+      setGameStates(updatedStates);
+      setInputScore("");
+      setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
     }
+  }, [inputScore, gameStates, currentPlayerIndex, playerStats, players.length, legStartingPlayerIndex, setStartingPlayerIndex]);
 
-    setGameStates(updatedStates);
-    setInputScore("");
-    setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
-  };
+  // Keyboard event listener voor numpad en toetsenbord
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle double checkout popup keyboard input
+      if (showDoublePopup && pendingDoubleCheckout) {
+        // Numpad toetsen (1-3) of normale cijfer toetsen voor double popup
+        let num: number | null = null;
+        if (event.key >= "1" && event.key <= "3") {
+          num = parseInt(event.key);
+        } else if (event.code.startsWith("Numpad") && (event.code === "Numpad1" || event.code === "Numpad2" || event.code === "Numpad3")) {
+          const numpadMatch = event.code.match(/Numpad(\d)/);
+          if (numpadMatch) {
+            num = parseInt(numpadMatch[1]);
+          }
+        }
+        
+        if (num !== null && !isNaN(num)) {
+          // Check of dit nummer een mogelijke optie is
+          if (pendingDoubleCheckout.possibleDartsOnDouble.includes(num)) {
+            setDoubleDarts(num);
+            event.preventDefault();
+          }
+        }
+        // Enter voor bevestigen
+        else if (event.key === "Enter") {
+          event.preventDefault();
+          if (doubleDarts !== null) {
+            confirmDoubleCheckout();
+          }
+        }
+        return;
+      }
+
+      // Negeer keyboard input als checkout popup of game finished screen open is
+      if (showCheckoutPopup || showGameFinished) {
+        return;
+      }
+
+      // Numpad toetsen (0-9) of normale cijfer toetsen
+      let num: number | null = null;
+      if (event.key >= "0" && event.key <= "9") {
+        num = parseInt(event.key);
+      } else if (event.code.startsWith("Numpad")) {
+        // Numpad toetsen: Numpad0 t/m Numpad9
+        const numpadMatch = event.code.match(/Numpad(\d)/);
+        if (numpadMatch) {
+          num = parseInt(numpadMatch[1]);
+        }
+      }
+      
+      if (num !== null && !isNaN(num)) {
+        setInputScore((prev) => {
+          if (prev.length < 3) {
+            return prev + num.toString();
+          }
+          return prev;
+        });
+        event.preventDefault();
+      }
+      // Backspace of Delete
+      else if (event.key === "Backspace" || event.key === "Delete") {
+        setInputScore((prev) => prev.slice(0, -1));
+        event.preventDefault();
+      }
+      // Enter voor submit
+      else if (event.key === "Enter") {
+        event.preventDefault();
+        // Roep handleSubmit direct aan
+        if (inputScore && inputScore !== "0" && !showCheckoutPopup && !showGameFinished) {
+          handleSubmit();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showCheckoutPopup, showGameFinished, showDoublePopup, pendingDoubleCheckout, doubleDarts, inputScore, handleSubmit, confirmDoubleCheckout]);
 
   const finishGame = async (
     finalStates: PlayerGameState[],
@@ -209,14 +484,63 @@ export default function Play501Game() {
     }
   };
 
+  // Helper functie om huidige state op te slaan in geschiedenis
+  const saveStateToHistory = useCallback(() => {
+    const currentStateCopy = gameStates.map(state => ({ ...state }));
+    const currentStatsCopy = new Map<number, DartStats>();
+    playerStats.forEach((stats, playerId) => {
+      currentStatsCopy.set(playerId, { ...stats });
+    });
+    
+    setGameHistory(prev => [...prev, {
+      gameStates: currentStateCopy,
+      playerStats: currentStatsCopy,
+      currentPlayerIndex,
+      legStartingPlayerIndex,
+      setStartingPlayerIndex,
+    }]);
+  }, [gameStates, playerStats, currentPlayerIndex, legStartingPlayerIndex, setStartingPlayerIndex]);
+
   const handleUndoTurn = () => {
-    // Reset de beurt - ga terug naar vorige speler en reset input
-    if (currentPlayerIndex > 0) {
-      setCurrentPlayerIndex(currentPlayerIndex - 1);
+    // Ga terug naar de vorige state in de geschiedenis
+    if (gameHistory.length > 0) {
+      const previousState = gameHistory[gameHistory.length - 1];
+      
+      // Herstel de game states
+      setGameStates(previousState.gameStates);
+      
+      // Herstel de player stats
+      setPlayerStats(previousState.playerStats);
+      
+      // Herstel de current player index
+      setCurrentPlayerIndex(previousState.currentPlayerIndex);
+      
+      // Herstel de starting player indices
+      setLegStartingPlayerIndex(previousState.legStartingPlayerIndex);
+      setSetStartingPlayerIndex(previousState.setStartingPlayerIndex);
+      
+      // Verwijder de laatste entry uit de geschiedenis
+      setGameHistory(gameHistory.slice(0, -1));
+      
+      // Reset input en popups
+      setInputScore("");
+      setShowCheckoutPopup(false);
+      setShowDoublePopup(false);
+      setPendingCheckout(null);
+      setPendingDoubleCheckout(null);
+      setCheckoutDarts(null);
+      setDoubleDarts(null);
+      setShowGameFinished(false);
+      setWinner(null);
     } else {
-      setCurrentPlayerIndex(players.length - 1);
+      // Geen geschiedenis, ga gewoon terug naar vorige speler
+      if (currentPlayerIndex > 0) {
+        setCurrentPlayerIndex(currentPlayerIndex - 1);
+      } else {
+        setCurrentPlayerIndex(players.length - 1);
+      }
+      setInputScore("");
     }
-    setInputScore("");
   };
 
   const handleMenu = () => {
@@ -228,6 +552,155 @@ export default function Play501Game() {
     return Math.round((state.totalScore / state.totalDarts) * 3 * 100) / 100;
   };
 
+  // Start method handlers
+  const handleBullsOrder = (player: Player) => {
+    if (!selectedOrder.find(p => p.id === player.id)) {
+      setSelectedOrder([...selectedOrder, player]);
+    }
+  };
+
+  const removeFromBullsOrder = (playerId: number) => {
+    setSelectedOrder(selectedOrder.filter(p => p.id !== playerId));
+  };
+
+  const confirmBullsOrder = () => {
+    if (selectedOrder.length === players.length) {
+      // Reorder players based on selected order
+      const reorderedStates = selectedOrder.map(player => {
+        const state = gameStates.find(s => s.player.id === player.id);
+        return state || {
+          player,
+          score: 501,
+          totalScore: 0,
+          totalDarts: 0,
+          dartsInCurrentLeg: 0,
+          lastScore: 0,
+          turns: 0,
+          legsWon: 0,
+          setsWon: 0,
+        };
+      });
+      setGameStates(reorderedStates);
+      setPlayers(selectedOrder);
+      setCurrentPlayerIndex(0);
+      setLegStartingPlayerIndex(0);
+      setSetStartingPlayerIndex(0);
+      setShowStartPopup(false);
+    }
+  };
+
+  const spinWheel = () => {
+    if (wheelSpinning) return;
+    setWheelSpinning(true);
+    const spins = 5 + Math.random() * 5; // 5-10 spins
+    const randomRotation = Math.random() * 360;
+    const totalRotation = wheelRotation + (spins * 360) + randomRotation;
+    setWheelRotation(totalRotation);
+
+    setTimeout(() => {
+      setWheelSpinning(false);
+      // Calculate which player is selected based on final rotation
+      // The pointer is at the top (0 degrees), so we need to account for the rotation
+      const normalizedRotation = totalRotation % 360;
+      const degreesPerPlayer = 360 / players.length;
+      // Since the wheel rotates, we need to reverse the calculation
+      // The selected player is the one at the top (0 degrees) after rotation
+      let selectedIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
+      if (selectedIndex < 0) selectedIndex += players.length;
+      
+      const selectedPlayer = players[selectedIndex];
+      const playerIndex = players.findIndex(p => p.id === selectedPlayer.id);
+      
+      // Reorder players so selected player is first
+      const reorderedPlayers = [
+        ...players.slice(playerIndex),
+        ...players.slice(0, playerIndex)
+      ];
+      setPlayers(reorderedPlayers);
+      
+      // Reorder game states to match
+      const reorderedStates = [
+        ...gameStates.slice(playerIndex),
+        ...gameStates.slice(0, playerIndex)
+      ];
+      setGameStates(reorderedStates);
+      
+      // Set the starting player (now at index 0 after reordering)
+      setCurrentPlayerIndex(0);
+      setLegStartingPlayerIndex(0);
+      setSetStartingPlayerIndex(0);
+      
+      setShowStartPopup(false);
+    }, 3000);
+  };
+
+  const flipCoin = () => {
+    if (coinFlipping) return;
+    setCoinFlipping(true);
+    const result = Math.random() < 0.5 ? "heads" : "tails";
+    
+    setTimeout(() => {
+      setCoinResult(result);
+      setCoinFlipping(false);
+      
+      // Assign based on coin flip
+      if (result === "heads") {
+        setCurrentPlayerIndex(0);
+        setLegStartingPlayerIndex(0);
+        setSetStartingPlayerIndex(0);
+      } else {
+        setCurrentPlayerIndex(1);
+        setLegStartingPlayerIndex(1);
+        setSetStartingPlayerIndex(1);
+      }
+      
+      setTimeout(() => {
+        setShowStartPopup(false);
+      }, 1500);
+    }, 2000);
+  };
+
+  // Device motion for shake detection
+  useEffect(() => {
+    if (!showStartPopup) return;
+
+    let lastShakeTime = 0;
+    const shakeThreshold = 15; // Adjust sensitivity
+
+    const handleDeviceMotion = (event: DeviceMotionEvent) => {
+      const acceleration = event.accelerationIncludingGravity;
+      if (!acceleration) return;
+
+      const { x, y, z } = acceleration;
+      const accelerationMagnitude = Math.sqrt(x * x + y * y + z * z);
+
+      const currentTime = Date.now();
+      if (accelerationMagnitude > shakeThreshold && currentTime - lastShakeTime > 1000) {
+        lastShakeTime = currentTime;
+        
+        if (startMethod === "wheel" && !wheelSpinning) {
+          spinWheel();
+        } else if (startMethod === "coin" && !coinFlipping && players.length === 2) {
+          flipCoin();
+        }
+      }
+    };
+
+    if (typeof DeviceMotionEvent !== "undefined" && typeof (DeviceMotionEvent as any).requestPermission === "function") {
+      (DeviceMotionEvent as any).requestPermission().then((permission: string) => {
+        if (permission === "granted") {
+          window.addEventListener("devicemotion", handleDeviceMotion);
+        }
+      });
+    } else {
+      window.addEventListener("devicemotion", handleDeviceMotion);
+    }
+
+    return () => {
+      window.removeEventListener("devicemotion", handleDeviceMotion);
+    };
+  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length]);
+
   if (players.length === 0 || gameStates.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -238,6 +711,241 @@ export default function Play501Game() {
 
   const isTwoPlayers = players.length === 2;
   const currentState = gameStates[currentPlayerIndex];
+
+  // Start Popup
+  if (showStartPopup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0A294F] p-4">
+        <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md">
+          <h2 className="text-2xl font-bold text-[#000000] mb-6 text-center">
+            Kies startmethode
+          </h2>
+
+          {!startMethod ? (
+            <div className="space-y-4">
+              <button
+                onClick={() => setStartMethod("bulls")}
+                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
+              >
+                Bullen
+              </button>
+              <button
+                onClick={() => setStartMethod("wheel")}
+                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
+              >
+                Radje draaien
+              </button>
+              {isTwoPlayers && (
+                <button
+                  onClick={() => setStartMethod("coin")}
+                  className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
+                >
+                  Coin flip
+                </button>
+              )}
+            </div>
+          ) : startMethod === "bulls" ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[#000000] mb-4">
+                Kies volgorde (klik op spelers)
+              </h3>
+              <div className="space-y-2 mb-4">
+                {players.map((player) => {
+                  const orderIndex = selectedOrder.findIndex(p => p.id === player.id);
+                  const isSelected = orderIndex !== -1;
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          removeFromBullsOrder(player.id);
+                        } else {
+                          handleBullsOrder(player);
+                        }
+                      }}
+                      className={`w-full py-3 px-4 rounded-lg text-left transition-all duration-150 ${
+                        isSelected
+                          ? "bg-[#0A294F] text-white"
+                          : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">{player.username}</span>
+                        {isSelected && (
+                          <span className="text-sm">#{orderIndex + 1}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setStartMethod(null);
+                    setSelectedOrder([]);
+                  }}
+                  className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold border-2 border-[#0A294F] hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
+                >
+                  Terug
+                </button>
+                <button
+                  onClick={confirmBullsOrder}
+                  disabled={selectedOrder.length !== players.length}
+                  className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Bevestigen
+                </button>
+              </div>
+            </div>
+          ) : startMethod === "wheel" ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[#000000] mb-4 text-center">
+                Radje draaien
+              </h3>
+              <div className="relative w-64 h-64 mx-auto mb-4">
+                <div
+                  className="absolute inset-0 rounded-full border-8 border-[#0A294F] transition-transform duration-3000 ease-out"
+                  style={{
+                    transform: `rotate(${wheelRotation}deg)`,
+                    background: `conic-gradient(${players.map((_, i) => {
+                      const colors = ["#28C7D8", "#E8F0FF", "#0A294F", "#D0E0FF", "#22a8b7", "#7E838F"];
+                      return `${colors[i % colors.length]} ${(i / players.length) * 360}deg ${((i + 1) / players.length) * 360}deg`;
+                    }).join(", ")})`,
+                  }}
+                />
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10">
+                  <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-[#0A294F]" />
+                </div>
+              </div>
+              
+              {/* Player names display box */}
+              <div className="bg-[#E8F0FF] rounded-xl p-4 mb-4">
+                <div className="text-center mb-2">
+                  <p className="text-sm font-semibold text-[#000000] mb-2">Spelers op het rad:</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {players.map((player, i) => {
+                      const colors = ["#28C7D8", "#E8F0FF", "#0A294F", "#D0E0FF", "#22a8b7", "#7E838F"];
+                      const color = colors[i % colors.length];
+                      return (
+                        <div
+                          key={player.id}
+                          className="px-3 py-1 rounded-lg text-sm font-semibold"
+                          style={{
+                            backgroundColor: color,
+                            color: color === "#0A294F" || color === "#7E838F" ? "white" : "#000000",
+                          }}
+                        >
+                          {player.username}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="text-center mb-4">
+                <p className="text-sm text-[#7E838F]">
+                  {wheelSpinning ? "Radje draait..." : "Schud je telefoon of klik op draaien"}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setStartMethod(null);
+                    setWheelRotation(0);
+                  }}
+                  className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold border-2 border-[#0A294F] hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
+                >
+                  Terug
+                </button>
+                <button
+                  onClick={spinWheel}
+                  disabled={wheelSpinning}
+                  className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {wheelSpinning ? "Draait..." : "Draaien"}
+                </button>
+              </div>
+            </div>
+          ) : startMethod === "coin" && isTwoPlayers ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-[#000000] mb-4 text-center">
+                Coin flip
+              </h3>
+              <div 
+                className="relative w-48 h-48 mx-auto mb-4"
+                style={{
+                  perspective: "1000px",
+                }}
+              >
+                <div
+                  className="relative w-full h-full"
+                  style={{
+                    transformStyle: "preserve-3d",
+                    transform: coinFlipping ? `rotateY(${1800}deg)` : coinResult === "heads" ? "rotateY(0deg)" : "rotateY(180deg)",
+                    transition: coinFlipping ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)" : "transform 0.3s ease-out",
+                  }}
+                >
+                  {/* Heads side - Player 1 */}
+                  <div
+                    className="absolute inset-0 rounded-full border-4 border-[#0A294F] bg-[#28C7D8] flex flex-col items-center justify-center text-white font-bold"
+                    style={{
+                      transform: "rotateY(0deg) translateZ(2px)",
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                    }}
+                  >
+                    <div className="text-xs mb-1">KOP</div>
+                    <div className="text-lg">{players[0].username}</div>
+                  </div>
+                  
+                  {/* Tails side - Player 2 */}
+                  <div
+                    className="absolute inset-0 rounded-full border-4 border-[#0A294F] bg-[#0A294F] flex flex-col items-center justify-center text-white font-bold"
+                    style={{
+                      transform: "rotateY(180deg) translateZ(2px)",
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                    }}
+                  >
+                    <div className="text-xs mb-1">MUNT</div>
+                    <div className="text-lg">{players[1].username}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center mb-4">
+                <p className="text-sm text-[#7E838F]">
+                  {coinFlipping
+                    ? "Munt draait..."
+                    : coinResult
+                    ? `${coinResult === "heads" ? players[0].username : players[1].username} begint!`
+                    : "Schud je telefoon of klik op flippen"}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setStartMethod(null);
+                    setCoinResult(null);
+                  }}
+                  className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold border-2 border-[#0A294F] hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
+                >
+                  Terug
+                </button>
+                <button
+                  onClick={flipCoin}
+                  disabled={coinFlipping}
+                  className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {coinFlipping ? "Flipt..." : "Flippen"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0A294F] pt-4 pb-6 px-4">
@@ -280,11 +988,9 @@ export default function Play501Game() {
                   <div className="text-sm font-bold text-[#000000]">
                     Legs: {gameStates[0].legsWon}
                   </div>
-                  {gameType === "sets" && (
-                    <div className="text-sm font-bold text-[#000000]">
-                      Sets: {gameStates[0].setsWon}
-                    </div>
-                  )}
+                  <div className="text-sm font-bold text-[#000000]">
+                    Sets: {gameStates[0].setsWon}
+                  </div>
                 </div>
                 <div className="text-xs space-y-1 text-white/80">
                   <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
@@ -307,11 +1013,9 @@ export default function Play501Game() {
                   <div className="text-sm font-bold text-white">
                     Legs: {gameStates[1].legsWon}
                   </div>
-                  {gameType === "sets" && (
-                    <div className="text-sm font-bold text-white">
-                      Sets: {gameStates[1].setsWon}
-                    </div>
-                  )}
+                  <div className="text-sm font-bold text-white">
+                    Sets: {gameStates[1].setsWon}
+                  </div>
                 </div>
                 <div className="text-xs space-y-1 text-[#7E838F]">
                   <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
@@ -352,14 +1056,12 @@ export default function Play501Game() {
                     >
                       Legs: {state.legsWon}
                     </div>
-                    {gameType === "sets" && (
-                      <div
-                        className={`text-xs font-bold ${index % 2 === 0 ? "text-[#000000]" : "text-white"
-                          }`}
-                      >
-                        Sets: {state.setsWon}
-                      </div>
-                    )}
+                    <div
+                      className={`text-xs font-bold ${index % 2 === 0 ? "text-[#000000]" : "text-white"
+                        }`}
+                    >
+                      Sets: {state.setsWon}
+                    </div>
                   </div>
                 </div>
                 <div
@@ -451,6 +1153,7 @@ export default function Play501Game() {
             6
           </button>
           <button
+            id="submit-score-button"
             onClick={handleSubmit}
             className="bg-[#28C7D8] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation row-span-2 flex items-center justify-center"
             style={{ minHeight: "136px" }}
@@ -525,6 +1228,301 @@ export default function Play501Game() {
           </button>
         </div>
       </div>
+
+      {/* Checkout Popup */}
+      {showCheckoutPopup && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
+            onClick={() => {
+              // Prevent closing without selection
+            }}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-[#000000] font-semibold text-xl mb-2">
+                  Uitgegooid!
+                </h2>
+                <p className="text-[#7E838F] text-sm">
+                  Met hoeveel pijlen ben je uitgegooid?
+                </p>
+              </div>
+
+              <div className="flex gap-3 mb-6">
+                <button
+                  onClick={() => setCheckoutDarts(1)}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
+                    checkoutDarts === 1
+                      ? "bg-[#0A294F] text-[#E8F0FF]"
+                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                  }`}
+                >
+                  1
+                </button>
+                <button
+                  onClick={() => setCheckoutDarts(2)}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
+                    checkoutDarts === 2
+                      ? "bg-[#0A294F] text-[#E8F0FF]"
+                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                  }`}
+                >
+                  2
+                </button>
+                <button
+                  onClick={() => setCheckoutDarts(3)}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
+                    checkoutDarts === 3
+                      ? "bg-[#0A294F] text-[#E8F0FF]"
+                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                  }`}
+                >
+                  3
+                </button>
+              </div>
+
+              <button
+                onClick={confirmCheckout}
+                disabled={!checkoutDarts}
+                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Bevestigen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Double Checkout Popup */}
+      {showDoublePopup && pendingDoubleCheckout && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
+            onClick={() => {
+              // Prevent closing without selection
+            }}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-[#000000] font-semibold text-xl mb-2">
+                  Mogelijke finish
+                </h2>
+                <p className="text-[#7E838F] text-sm mb-2">
+                  Je staat op {pendingDoubleCheckout.currentState.score - pendingDoubleCheckout.score}
+                </p>
+                <p className="text-[#7E838F] text-sm">
+                  Hoeveel pijlen heb je op een dubbel gegooid?
+                </p>
+              </div>
+
+              <div className="flex gap-3 mb-6 justify-center">
+                {pendingDoubleCheckout.possibleDartsOnDouble
+                  .sort((a, b) => a - b)
+                  .map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => setDoubleDarts(num)}
+                      className={`w-20 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
+                        doubleDarts === num
+                          ? "bg-[#0A294F] text-[#E8F0FF]"
+                          : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+              </div>
+
+              <button
+                onClick={confirmDoubleCheckout}
+                disabled={doubleDarts === null}
+                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Bevestigen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Game Finished Screen */}
+      {showGameFinished && winner && (
+        <>
+          {/* Overlay */}
+          <div className="fixed inset-0 bg-[#0A294F] bg-opacity-90 backdrop-blur-sm z-50 transition-opacity duration-300" />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-4xl my-8">
+              {/* Winnaar header */}
+              <div className="text-center mb-6">
+                <h1 className="text-3xl font-bold text-[#000000] mb-2">
+                  🎯 {winner.player.username} heeft gewonnen! 🎯
+                </h1>
+                <p className="text-[#7E838F] text-sm">
+                  {winner.setsWon} - {gameStates.find(s => s.player.id !== winner.player.id)?.setsWon || 0} Sets
+                </p>
+              </div>
+
+              {/* Statistieken grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Speler 1 statistieken */}
+                {gameStates.map((state, index) => {
+                  const playerStat = playerStats.get(state.player.id) || createInitialStats();
+                  const avg = state.totalDarts > 0 ? Math.round((state.totalScore / state.totalDarts) * 3 * 100) / 100 : 0;
+                  const first9Avg = playerStat.first9Turns > 0 ? Math.round((playerStat.first9Score / playerStat.first9Turns) * 100) / 100 : 0;
+                  const threeDartAvg = playerStat.totalTurns > 0 ? Math.round((playerStat.totalScore / playerStat.totalTurns) * 100) / 100 : 0;
+
+                  return (
+                    <div
+                      key={state.player.id}
+                      className={`rounded-xl p-4 ${
+                        index === 0
+                          ? "bg-[#28C7D8] text-white"
+                          : "bg-white text-[#000000]"
+                      }`}
+                    >
+                      <div className="text-center mb-4">
+                        <h3 className="font-bold text-lg mb-1">
+                          {state.player.username}
+                        </h3>
+                        {state.player.id === winner.player.id && (
+                          <span className="text-xs font-semibold">🏆 Winnaar</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="opacity-80">Sets:</span>
+                          <span className="font-bold">{state.setsWon}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-80">Legs:</span>
+                          <span className="font-bold">{state.legsWon}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-80">3-dart avg:</span>
+                          <span className="font-bold">{avg.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-80">Totaal darts:</span>
+                          <span className="font-bold">{state.totalDarts}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="opacity-80">180's:</span>
+                          <span className="font-bold">{playerStat.oneEighties}</span>
+                        </div>
+                        {trackDoubles && (
+                          <div className="flex justify-between">
+                            <span className="opacity-80">Dubbel%:</span>
+                            <span className="font-bold">
+                              {playerStat.doublesThrown > 0
+                                ? ((playerStat.doublesHit / playerStat.doublesThrown) * 100).toFixed(1)
+                                : "0.0"}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Midden: Algemene statistieken */}
+                <div className="rounded-xl p-4 bg-[#0A294F] text-white">
+                  <div className="text-center mb-4">
+                    <h3 className="font-bold text-lg mb-1">Algemene Statistieken</h3>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    {gameStates.map((state, index) => {
+                      const playerStat = playerStats.get(state.player.id) || createInitialStats();
+                      const first9Avg = playerStat.first9Turns > 0 ? Math.round((playerStat.first9Score / playerStat.first9Turns) * 100) / 100 : 0;
+                      const threeDartAvg = playerStat.totalTurns > 0 ? Math.round((playerStat.totalScore / playerStat.totalTurns) * 100) / 100 : 0;
+
+                      return (
+                        <div key={state.player.id} className="mb-3">
+                          <div className="font-semibold mb-1">{state.player.username}:</div>
+                          <div className="space-y-1 text-xs opacity-90">
+                            <div className="flex justify-between">
+                              <span>First 9 avg:</span>
+                              <span>{first9Avg.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>3-dart avg:</span>
+                              <span>{threeDartAvg.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Beurten:</span>
+                              <span>{playerStat.totalTurns}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Totaal score:</span>
+                              <span>{playerStat.totalScore}</span>
+                            </div>
+                            {trackDoubles && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span>Doubles geraakt:</span>
+                                  <span>{playerStat.doublesHit}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Doubles gegooid:</span>
+                                  <span>{playerStat.doublesThrown}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Dubbelpercentage:</span>
+                                  <span>
+                                    {playerStat.doublesThrown > 0
+                                      ? ((playerStat.doublesHit / playerStat.doublesThrown) * 100).toFixed(1)
+                                      : "0.0"}%
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleMenu}
+                  className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold text-sm hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150 border-2 border-[#0A294F]"
+                >
+                  Terug naar menu
+                </button>
+                <button
+                  onClick={() => {
+                    setShowGameFinished(false);
+                    router.push("/speel-501");
+                  }}
+                  className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold text-sm hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
+                >
+                  Nieuw spel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div >
   );
 }

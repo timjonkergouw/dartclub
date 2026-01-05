@@ -47,6 +47,18 @@ export const registerTurn = (
     return updated;
 };
 
+/// registreer dubbel poging ///
+export const registerDoubleAttempt = (
+    stats: DartStats,
+    dartsOnDouble: number,
+    doublesHit: number
+): DartStats => {
+    const updated = { ...stats };
+    updated.doublesThrown += dartsOnDouble;
+    updated.doublesHit += doublesHit;
+    return updated;
+};
+
 /// finish ///
 
 export const calculateFinalStats = (

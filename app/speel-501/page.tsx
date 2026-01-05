@@ -15,6 +15,7 @@ export default function Speel501() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"select" | "create">("select");
   const [selectedPlayers, setSelectedPlayers] = useState<{ id: number; username: string }[]>([]);
+  const [trackDoubles, setTrackDoubles] = useState(false);
 
   const incrementCounter = () => {
     setCounter(counter + 1);
@@ -428,13 +429,36 @@ export default function Speel501() {
         </div>
       </div>
 
+      {/* Dubbelpercentage toggle */}
+      <div className="w-full max-w-md mx-auto mt-4 mb-4">
+        <div className="bg-[#E8F0FF] rounded-2xl p-4 shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="text-[#000000] font-semibold text-base">
+                Dubbelpercentage bijhouden
+              </div>
+            </div>
+            <button
+              onClick={() => setTrackDoubles(!trackDoubles)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#0A294F] focus:ring-offset-2 ${trackDoubles ? "bg-[#28C7D8]" : "bg-gray-300"
+                }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform duration-200 ${trackDoubles ? "translate-x-7" : "translate-x-1"
+                  }`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Start Game Button - Onderaan */}
       {selectedPlayers.length > 0 && (
         <div className="w-full max-w-md mx-auto mt-auto mb-4">
           <Link
             href={`/play501game?players=${encodeURIComponent(
               JSON.stringify(selectedPlayers)
-            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}`}
+            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=${trackDoubles}`}
             className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
           >
             Start Game
