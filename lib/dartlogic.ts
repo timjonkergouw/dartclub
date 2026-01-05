@@ -66,8 +66,8 @@ export const calculateFinalStats = (
     finishScore: number
 ) => {
     return {
-        three_dart_avg: stats.totalScore / stats.totalTurns,
-        first9_avg: stats.first9Score / stats.first9Turns,
+        three_dart_avg: stats.totalTurns > 0 ? stats.totalScore / stats.totalTurns : 0,
+        first9_avg: stats.first9Turns > 0 ? stats.first9Score / stats.first9Turns : 0,
         finish: finishScore,
         doubles_hit: stats.doublesHit,
         doubles_thrown: stats.doublesThrown,

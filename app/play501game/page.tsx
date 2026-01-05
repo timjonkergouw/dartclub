@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import {
   createInitialStats,
@@ -12,7 +11,7 @@ import {
   type DartStats,
 } from "@/lib/dartlogic";
 import { supabase } from "@/lib/supabase";
-import { calculateCheckoutInfo, getMinDartsOnDouble, getMaxDartsOnDouble } from "@/lib/checkout";
+import { calculateCheckoutInfo } from "@/lib/checkout";
 
 interface Player {
   id: number;
@@ -31,7 +30,7 @@ interface PlayerGameState {
   setsWon: number;
 }
 
-export default function Play501Game() {
+function Play501GameContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -81,6 +80,9 @@ export default function Play501Game() {
   const [coinResult, setCoinResult] = useState<"heads" | "tails" | null>(null);
 
   useEffect(() => {
+    if (!searchParams) return;
+    if (typeof window === "undefined") return;
+    
     const playersParam = searchParams.get("players");
     const modeParam = searchParams.get("mode");
     const typeParam = searchParams.get("type");
@@ -90,10 +92,17 @@ export default function Play501Game() {
     if (playersParam) {
       try {
         const parsedPlayers = JSON.parse(playersParam);
+        if (!Array.isArray(parsedPlayers) || parsedPlayers.length === 0) {
+          if (typeof window !== "undefined") {
+            router.push("/speel-501");
+          }
+          return;
+        }
+        
         setPlayers(parsedPlayers);
         setGameMode((modeParam as "first-to" | "best-of") || "first-to");
         setGameType((typeParam as "sets" | "legs") || "legs");
-        setTarget(parseInt(targetParam || "1"));
+        setTarget(parseInt(targetParam || "1", 10) || 1);
         setTrackDoubles(trackDoublesParam === "true");
 
         // Initialize game states
@@ -131,10 +140,14 @@ export default function Play501Game() {
         setShowStartPopup(true);
       } catch (error) {
         console.error("Error parsing players:", error);
-        router.push("/speel-501");
+        if (typeof window !== "undefined") {
+          router.push("/speel-501");
+        }
       }
     } else {
-      router.push("/speel-501");
+      if (typeof window !== "undefined") {
+        router.push("/speel-501");
+      }
     }
   }, [searchParams, router]);
 
@@ -165,7 +178,7 @@ export default function Play501Game() {
       setStartingPlayerIndex,
     }]);
 
-    const { score, currentState, updatedStates, updatedStats, possibleDartsOnDouble } = pendingDoubleCheckout;
+    const { score, currentState, updatedStates, updatedStats } = pendingDoubleCheckout;
     const updatedStatesCopy = [...updatedStates];
     const updatedStatsCopy = new Map(updatedStats);
 
@@ -376,7 +389,7 @@ export default function Play501Game() {
       setInputScore("");
       setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
     }
-  }, [inputScore, gameStates, currentPlayerIndex, playerStats, players.length, legStartingPlayerIndex, setStartingPlayerIndex]);
+  }, [inputScore, gameStates, currentPlayerIndex, playerStats, players.length, legStartingPlayerIndex, setStartingPlayerIndex, trackDoubles]);
 
   // Keyboard event listener voor numpad en toetsenbord
   useEffect(() => {
@@ -462,6 +475,9 @@ export default function Play501Game() {
     finalStates: PlayerGameState[],
     finalStats: Map<number, DartStats>
   ) => {
+    // Only execute on client side
+    if (typeof window === "undefined") return;
+
     try {
       // Save stats for each player
       const statsPromises = finalStates.map(async (state) => {
@@ -470,11 +486,15 @@ export default function Play501Game() {
 
         const finalStatsData = calculateFinalStats(playerStat, state.lastScore);
 
-        await supabase.from("dart_stats").insert({
+        const { error } = await supabase.from("dart_stats").insert({
           game_id: gameId,
           player_id: state.player.id,
           ...finalStatsData,
         });
+
+        if (error) {
+          console.error(`Error saving stats for player ${state.player.id}:`, error);
+        }
       });
 
       await Promise.all(statsPromises);
@@ -484,22 +504,6 @@ export default function Play501Game() {
     }
   };
 
-  // Helper functie om huidige state op te slaan in geschiedenis
-  const saveStateToHistory = useCallback(() => {
-    const currentStateCopy = gameStates.map(state => ({ ...state }));
-    const currentStatsCopy = new Map<number, DartStats>();
-    playerStats.forEach((stats, playerId) => {
-      currentStatsCopy.set(playerId, { ...stats });
-    });
-    
-    setGameHistory(prev => [...prev, {
-      gameStates: currentStateCopy,
-      playerStats: currentStatsCopy,
-      currentPlayerIndex,
-      legStartingPlayerIndex,
-      setStartingPlayerIndex,
-    }]);
-  }, [gameStates, playerStats, currentPlayerIndex, legStartingPlayerIndex, setStartingPlayerIndex]);
 
   const handleUndoTurn = () => {
     // Ga terug naar de vorige state in de geschiedenis
@@ -663,6 +667,7 @@ export default function Play501Game() {
   // Device motion for shake detection
   useEffect(() => {
     if (!showStartPopup) return;
+    if (typeof window === "undefined") return;
 
     let lastShakeTime = 0;
     const shakeThreshold = 15; // Adjust sensitivity
@@ -672,6 +677,8 @@ export default function Play501Game() {
       if (!acceleration) return;
 
       const { x, y, z } = acceleration;
+      if (x === null || y === null || z === null) return;
+      
       const accelerationMagnitude = Math.sqrt(x * x + y * y + z * z);
 
       const currentTime = Date.now();
@@ -686,12 +693,24 @@ export default function Play501Game() {
       }
     };
 
-    if (typeof DeviceMotionEvent !== "undefined" && typeof (DeviceMotionEvent as any).requestPermission === "function") {
-      (DeviceMotionEvent as any).requestPermission().then((permission: string) => {
-        if (permission === "granted") {
-          window.addEventListener("devicemotion", handleDeviceMotion);
-        }
-      });
+    interface DeviceMotionEventWithPermission extends DeviceMotionEvent {
+      requestPermission?: () => Promise<PermissionState>;
+    }
+
+    if (typeof DeviceMotionEvent !== "undefined") {
+      const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
+        requestPermission?: () => Promise<PermissionState>;
+      };
+      
+      if (typeof DeviceMotionEventWithPerm.requestPermission === "function") {
+        DeviceMotionEventWithPerm.requestPermission().then((permission: PermissionState) => {
+          if (permission === "granted") {
+            window.addEventListener("devicemotion", handleDeviceMotion);
+          }
+        });
+      } else {
+        window.addEventListener("devicemotion", handleDeviceMotion);
+      }
     } else {
       window.addEventListener("devicemotion", handleDeviceMotion);
     }
@@ -699,12 +718,12 @@ export default function Play501Game() {
     return () => {
       window.removeEventListener("devicemotion", handleDeviceMotion);
     };
-  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length]);
+  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel]);
 
-  if (players.length === 0 || gameStates.length === 0) {
+  if (typeof window === "undefined" || players.length === 0 || gameStates.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-[#000000]">Laden...</div>
+      <div className="min-h-screen flex items-center justify-center bg-[#0A294F]">
+        <div className="text-white">Laden...</div>
       </div>
     );
   }
@@ -1381,17 +1400,15 @@ export default function Play501Game() {
               {/* Statistieken grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 {/* Speler 1 statistieken */}
-                {gameStates.map((state, index) => {
+                {gameStates.map((state, idx) => {
                   const playerStat = playerStats.get(state.player.id) || createInitialStats();
                   const avg = state.totalDarts > 0 ? Math.round((state.totalScore / state.totalDarts) * 3 * 100) / 100 : 0;
-                  const first9Avg = playerStat.first9Turns > 0 ? Math.round((playerStat.first9Score / playerStat.first9Turns) * 100) / 100 : 0;
-                  const threeDartAvg = playerStat.totalTurns > 0 ? Math.round((playerStat.totalScore / playerStat.totalTurns) * 100) / 100 : 0;
 
                   return (
                     <div
                       key={state.player.id}
                       className={`rounded-xl p-4 ${
-                        index === 0
+                        idx === 0
                           ? "bg-[#28C7D8] text-white"
                           : "bg-white text-[#000000]"
                       }`}
@@ -1423,7 +1440,7 @@ export default function Play501Game() {
                           <span className="font-bold">{state.totalDarts}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="opacity-80">180's:</span>
+                          <span className="opacity-80">180&apos;s:</span>
                           <span className="font-bold">{playerStat.oneEighties}</span>
                         </div>
                         {trackDoubles && (
@@ -1448,7 +1465,7 @@ export default function Play501Game() {
                   </div>
 
                   <div className="space-y-2 text-sm">
-                    {gameStates.map((state, index) => {
+                    {gameStates.map((state) => {
                       const playerStat = playerStats.get(state.player.id) || createInitialStats();
                       const first9Avg = playerStat.first9Turns > 0 ? Math.round((playerStat.first9Score / playerStat.first9Turns) * 100) / 100 : 0;
                       const threeDartAvg = playerStat.totalTurns > 0 ? Math.round((playerStat.totalScore / playerStat.totalTurns) * 100) / 100 : 0;
@@ -1524,5 +1541,19 @@ export default function Play501Game() {
         </>
       )}
     </div >
+  );
+}
+
+export default function Play501Game() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#0A294F]">
+          <div className="text-white">Laden...</div>
+        </div>
+      }
+    >
+      <Play501GameContent />
+    </Suspense>
   );
 }

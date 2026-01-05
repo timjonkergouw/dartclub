@@ -62,6 +62,9 @@ export default function Speel501() {
   };
 
   const fetchProfiles = async () => {
+    // Only execute on client side
+    if (typeof window === "undefined") return;
+
     try {
       const { data, error } = await supabase.from("profiles").select("*");
       if (error) throw error;
