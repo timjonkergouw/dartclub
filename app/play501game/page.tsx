@@ -78,6 +78,9 @@ function Play501GameContent() {
   const [wheelRotation, setWheelRotation] = useState(0);
   const [coinFlipping, setCoinFlipping] = useState(false);
   const [coinResult, setCoinResult] = useState<"heads" | "tails" | null>(null);
+  const [coinRotation, setCoinRotation] = useState(0);
+  const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
+  const [showPermissionInstructions, setShowPermissionInstructions] = useState(false);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -641,9 +644,25 @@ function Play501GameContent() {
   const flipCoin = () => {
     if (coinFlipping) return;
     setCoinFlipping(true);
+    setCoinResult(null); // Reset result before flipping
     const result = Math.random() < 0.5 ? "heads" : "tails";
     
+    // Calculate end rotation: start from current rotation, add 5 full rotations (1800deg)
+    // plus the result offset (0deg for heads, 180deg for tails)
+    // This ensures smooth transition to final position
+    const baseRotations = 5; // 5 full rotations
+    const baseDegrees = baseRotations * 360; // 1800deg
+    const resultOffset = result === "heads" ? 0 : 180;
+    const endRotation = coinRotation + baseDegrees + resultOffset;
+    
+    // Set the rotation immediately to start the animation
+    setCoinRotation(endRotation);
+    
+    // After animation completes, set result and stop flipping
     setTimeout(() => {
+      // Normalize rotation to 0-360 range for display
+      const normalizedRotation = endRotation % 360;
+      setCoinRotation(normalizedRotation);
       setCoinResult(result);
       setCoinFlipping(false);
       
@@ -664,61 +683,218 @@ function Play501GameContent() {
     }, 2000);
   };
 
+  // Function to request device motion permission (must be called in user gesture context)
+  const requestMotionPermission = async () => {
+    if (typeof window === "undefined") {
+      console.log("Window not available");
+      return false;
+    }
+    
+    // Check if page is loaded over HTTPS (required for iOS)
+    if (window.location.protocol !== "https:" && window.location.hostname !== "localhost" && !window.location.hostname.startsWith("127.0.0.1")) {
+      console.warn("Device motion requires HTTPS (or localhost)");
+      alert("Voor schudden is een beveiligde verbinding (HTTPS) nodig. De app werkt nog steeds, maar schudden is niet beschikbaar.");
+      return false;
+    }
+    
+    if (typeof DeviceMotionEvent === "undefined") {
+      console.log("DeviceMotionEvent not supported in this browser");
+      return false;
+    }
+
+    console.log("Checking device motion permission...");
+    console.log("User agent:", navigator.userAgent);
+    console.log("Protocol:", window.location.protocol);
+    
+    const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
+      requestPermission?: () => Promise<PermissionState>;
+    };
+
+    // Check if permission request is available (iOS 13+)
+    if (typeof DeviceMotionEventWithPerm.requestPermission === "function") {
+      try {
+        console.log("Permission request function found - requesting permission...");
+        setShowPermissionInstructions(true);
+        
+        // Request permission - this should show a native popup on iOS
+        const permission = await DeviceMotionEventWithPerm.requestPermission();
+        
+        console.log("Permission result received:", permission);
+        setShowPermissionInstructions(false);
+        
+        if (permission === "granted") {
+          console.log("Permission granted! Motion detection enabled.");
+          setMotionPermissionGranted(true);
+          return true;
+        } else if (permission === "denied") {
+          console.log("Permission denied by user");
+          setMotionPermissionGranted(false);
+          alert("Toestemming geweigerd. Je kunt nog steeds op de knop klikken om handmatig te flippen/draaien.\n\nOm schudden in te schakelen, ga naar Instellingen > Safari > Beweging en toegang tot beweging toestaan.");
+          return false;
+        } else {
+          console.log("Permission prompt dismissed or not granted:", permission);
+          setMotionPermissionGranted(false);
+          return false;
+        }
+      } catch (error) {
+        console.error("Error requesting motion permission:", error);
+        setShowPermissionInstructions(false);
+        setMotionPermissionGranted(false);
+        // Try to continue anyway - maybe permission isn't needed
+        return false;
+      }
+    } else {
+      // No permission required (Android, older iOS, or desktop)
+      console.log("No permission required for device motion - enabling directly");
+      setMotionPermissionGranted(true);
+      return true;
+    }
+  };
+
   // Device motion for shake detection
   useEffect(() => {
     if (!showStartPopup) return;
     if (typeof window === "undefined") return;
 
     let lastShakeTime = 0;
-    const shakeThreshold = 15; // Adjust sensitivity
+    const shakeThreshold = 12; // Lower threshold for better iOS compatibility
+    let listenerAdded = false;
+
+    // Store previous acceleration values for better shake detection
+    let lastX = 0;
+    let lastY = 0;
+    let lastZ = 0;
 
     const handleDeviceMotion = (event: DeviceMotionEvent) => {
-      const acceleration = event.accelerationIncludingGravity;
+      // Try accelerationIncludingGravity first (Android), then acceleration (iOS)
+      let acceleration = event.accelerationIncludingGravity;
+      if (!acceleration || acceleration.x === null || acceleration.y === null || acceleration.z === null) {
+        acceleration = event.acceleration;
+      }
+      
       if (!acceleration) return;
-
       const { x, y, z } = acceleration;
       if (x === null || y === null || z === null) return;
       
+      // Calculate change in acceleration (better for shake detection)
+      const deltaX = Math.abs(x - lastX);
+      const deltaY = Math.abs(y - lastY);
+      const deltaZ = Math.abs(z - lastZ);
+      const totalDelta = deltaX + deltaY + deltaZ;
+      
+      // Also calculate acceleration magnitude
       const accelerationMagnitude = Math.sqrt(x * x + y * y + z * z);
-
+      
+      // Update last values
+      lastX = x;
+      lastY = y;
+      lastZ = z;
+      
       const currentTime = Date.now();
-      if (accelerationMagnitude > shakeThreshold && currentTime - lastShakeTime > 1000) {
+      const timeSinceLastShake = currentTime - lastShakeTime;
+      
+      // Use both delta and magnitude for better detection
+      // Lower threshold for delta (change detection) works better on iOS
+      const isShake = (totalDelta > 3 || accelerationMagnitude > shakeThreshold) && timeSinceLastShake > 800;
+      
+      if (isShake) {
         lastShakeTime = currentTime;
         
+        console.log("Shake detected!", { 
+          totalDelta, 
+          accelerationMagnitude, 
+          startMethod, 
+          wheelSpinning, 
+          coinFlipping,
+          x, y, z
+        });
+        
         if (startMethod === "wheel" && !wheelSpinning) {
+          console.log("Spinning wheel via shake");
           spinWheel();
         } else if (startMethod === "coin" && !coinFlipping && players.length === 2) {
+          console.log("Flipping coin via shake");
           flipCoin();
         }
       }
     };
 
-    interface DeviceMotionEventWithPermission extends DeviceMotionEvent {
-      requestPermission?: () => Promise<PermissionState>;
-    }
+    const setupDeviceMotion = async () => {
+      if (listenerAdded) {
+        console.log("Listener already added");
+        return;
+      }
 
-    if (typeof DeviceMotionEvent !== "undefined") {
+      // Check if DeviceMotionEvent is available
+      if (typeof DeviceMotionEvent === "undefined") {
+        console.log("DeviceMotionEvent is not supported");
+        return;
+      }
+
+      // For iOS 13+ and some browsers, we need to request permission
       const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
         requestPermission?: () => Promise<PermissionState>;
       };
-      
-      if (typeof DeviceMotionEventWithPerm.requestPermission === "function") {
-        DeviceMotionEventWithPerm.requestPermission().then((permission: PermissionState) => {
-          if (permission === "granted") {
-            window.addEventListener("devicemotion", handleDeviceMotion);
+
+      try {
+        // If permission is already granted (from button click), add listener directly
+        if (motionPermissionGranted || typeof DeviceMotionEventWithPerm.requestPermission !== "function") {
+          console.log("Adding device motion listener (permission already granted or not required)");
+          window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
+          listenerAdded = true;
+          if (!motionPermissionGranted) {
+            setMotionPermissionGranted(true);
           }
-        });
-      } else {
-        window.addEventListener("devicemotion", handleDeviceMotion);
+        } else {
+          // Try to request permission (but this might not work if not in user gesture)
+          console.log("Attempting to request permission in useEffect...");
+          const permission = await DeviceMotionEventWithPerm.requestPermission();
+          if (permission === "granted") {
+            window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
+            listenerAdded = true;
+            setMotionPermissionGranted(true);
+            console.log("Device motion permission granted and listener added");
+          } else {
+            console.log("Device motion permission denied in useEffect");
+            setMotionPermissionGranted(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error setting up device motion:", error);
+        // Try to add listener anyway for browsers that don't require permission
+        try {
+          console.log("Trying to add listener without permission check...");
+          window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
+          listenerAdded = true;
+          setMotionPermissionGranted(true);
+          console.log("Device motion listener added (fallback)");
+        } catch (e) {
+          console.error("Failed to add device motion listener:", e);
+          setMotionPermissionGranted(false);
+        }
       }
-    } else {
-      window.addEventListener("devicemotion", handleDeviceMotion);
+    };
+
+    // Set up device motion listener
+    // If permission is already granted, set up immediately
+    // Otherwise, wait for permission to be granted via button click
+    if (motionPermissionGranted) {
+      setupDeviceMotion();
+    } else if (typeof DeviceMotionEvent !== "undefined") {
+      const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
+        requestPermission?: () => Promise<PermissionState>;
+      };
+      // If permission is not required (Android, older iOS), set up immediately
+      if (typeof DeviceMotionEventWithPerm.requestPermission !== "function") {
+        setupDeviceMotion();
+      }
     }
 
     return () => {
       window.removeEventListener("devicemotion", handleDeviceMotion);
+      listenerAdded = false;
     };
-  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel]);
+  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel, motionPermissionGranted]);
 
   if (typeof window === "undefined" || players.length === 0 || gameStates.length === 0) {
     return (
@@ -749,14 +925,26 @@ function Play501GameContent() {
                 Bullen
               </button>
               <button
-                onClick={() => setStartMethod("wheel")}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  console.log("Wheel button clicked - requesting permission...");
+                  const granted = await requestMotionPermission();
+                  console.log("Permission result for wheel:", granted);
+                  setStartMethod("wheel");
+                }}
                 className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
               >
                 Radje draaien
               </button>
               {isTwoPlayers && (
                 <button
-                  onClick={() => setStartMethod("coin")}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    console.log("Coin button clicked - requesting permission...");
+                    const granted = await requestMotionPermission();
+                    console.log("Permission result for coin:", granted);
+                    setStartMethod("coin");
+                  }}
                   className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
                 >
                   Coin flip
@@ -864,8 +1052,21 @@ function Play501GameContent() {
               </div>
               <div className="text-center mb-4">
                 <p className="text-sm text-[#7E838F]">
-                  {wheelSpinning ? "Radje draait..." : "Schud je telefoon of klik op draaien"}
+                  {wheelSpinning 
+                    ? "Radje draait..." 
+                    : showPermissionInstructions
+                    ? "Wacht op toestemmingsvenster..."
+                    : motionPermissionGranted
+                    ? "Schud je telefoon of klik op draaien"
+                    : "Klik op draaien om toestemming te geven voor schudden"}
                 </p>
+                {!motionPermissionGranted && !showPermissionInstructions && (
+                  <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
+                    <p>Er verschijnt een popup bovenaan je scherm. Klik op "Toestaan" om schudden in te schakelen.</p>
+                    <p className="text-[#0A294F] font-semibold mt-2">Als er geen popup verschijnt:</p>
+                    <p>Ga naar Instellingen → Safari → Beweging en toegang tot beweging toestaan</p>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3">
                 <button
@@ -901,8 +1102,10 @@ function Play501GameContent() {
                   className="relative w-full h-full"
                   style={{
                     transformStyle: "preserve-3d",
-                    transform: coinFlipping ? `rotateY(${1800}deg)` : coinResult === "heads" ? "rotateY(0deg)" : "rotateY(180deg)",
-                    transition: coinFlipping ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)" : "transform 0.3s ease-out",
+                    transform: `rotateY(${coinRotation}deg)`,
+                    transition: coinFlipping 
+                      ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)" 
+                      : "transform 0s",
                   }}
                 >
                   {/* Heads side - Player 1 */}
@@ -938,14 +1141,26 @@ function Play501GameContent() {
                     ? "Munt draait..."
                     : coinResult
                     ? `${coinResult === "heads" ? players[0].username : players[1].username} begint!`
-                    : "Schud je telefoon of klik op flippen"}
+                    : showPermissionInstructions
+                    ? "Wacht op toestemmingsvenster..."
+                    : motionPermissionGranted
+                    ? "Schud je telefoon of klik op flippen"
+                    : "Klik op flippen om toestemming te geven voor schudden"}
                 </p>
+                {!motionPermissionGranted && !showPermissionInstructions && !coinResult && (
+                  <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
+                    <p>Er verschijnt een popup bovenaan je scherm. Klik op "Toestaan" om schudden in te schakelen.</p>
+                    <p className="text-[#0A294F] font-semibold mt-2">Als er geen popup verschijnt:</p>
+                    <p>Ga naar Instellingen → Safari → Beweging en toegang tot beweging toestaan</p>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setStartMethod(null);
                     setCoinResult(null);
+                    setCoinRotation(0);
                   }}
                   className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold border-2 border-[#0A294F] hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
                 >

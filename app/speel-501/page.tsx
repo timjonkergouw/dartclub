@@ -34,17 +34,23 @@ export default function Speel501() {
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from("profiles").insert({ username: name }).select();
-      if (error) throw error;
+      const { data, error } = await supabase.from("profiles").insert({ username: name.trim() }).select();
+      if (error) {
+        console.error("Supabase error:", error);
+        alert(`Fout bij aanmaken profiel: ${error.message || JSON.stringify(error)}`);
+        throw error;
+      }
       if (data && data[0]) {
         setSelectedPlayers([...selectedPlayers, data[0]]);
         setName("");
         fetchProfiles();
         setModalMode("select");
+        setIsModalOpen(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating profile:", error);
-      alert("Er is een fout opgetreden bij het aanmaken van het profiel");
+      const errorMessage = error?.message || error?.error_description || "Onbekende fout";
+      alert(`Er is een fout opgetreden bij het aanmaken van het profiel: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
