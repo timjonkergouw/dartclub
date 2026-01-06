@@ -4,11 +4,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Create client with safe fallbacks
-// During build/SSR, if env vars are missing, create a placeholder that won't crash
+// Create Supabase client with safe fallbacks for build-time
+// During Next.js build/SSR, environment variables might not be available
+// This fallback prevents build crashes while still allowing the app to run
 const createSupabaseClient = (): SupabaseClient => {
   if (!supabaseUrl || !supabaseAnonKey) {
-    // Create placeholder client for build/SSR when env vars are missing
+    // Return a dummy client during build/SSR to prevent crashes
+    // This client will not work for actual database operations
     return createClient(
       'https://placeholder.supabase.co',
       'placeholder-key',

@@ -47,9 +47,9 @@ export default function Speel501() {
         setModalMode("select");
         setIsModalOpen(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating profile:", error);
-      const errorMessage = error?.message || error?.error_description || "Onbekende fout";
+      const errorMessage = error instanceof Error ? error.message : (error as { error_description?: string })?.error_description || "Onbekende fout";
       alert(`Er is een fout opgetreden bij het aanmaken van het profiel: ${errorMessage}`);
     } finally {
       setIsLoading(false);

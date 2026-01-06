@@ -596,7 +596,7 @@ function Play501GameContent() {
     }
   };
 
-  const spinWheel = () => {
+  const spinWheel = useCallback(() => {
     if (wheelSpinning) return;
     setWheelSpinning(true);
     const spins = 5 + Math.random() * 5; // 5-10 spins
@@ -639,9 +639,9 @@ function Play501GameContent() {
       
       setShowStartPopup(false);
     }, 3000);
-  };
+  }, [wheelSpinning, wheelRotation, players, gameStates]);
 
-  const flipCoin = () => {
+  const flipCoin = useCallback(() => {
     if (coinFlipping) return;
     setCoinFlipping(true);
     setCoinResult(null); // Reset result before flipping
@@ -681,7 +681,7 @@ function Play501GameContent() {
         setShowStartPopup(false);
       }, 1500);
     }, 2000);
-  };
+  }, [coinFlipping, coinRotation]);
 
   // Function to request device motion permission (must be called in user gesture context)
   const requestMotionPermission = async () => {
@@ -905,7 +905,6 @@ function Play501GameContent() {
   }
 
   const isTwoPlayers = players.length === 2;
-  const currentState = gameStates[currentPlayerIndex];
 
   // Start Popup
   if (showStartPopup) {
@@ -1062,7 +1061,7 @@ function Play501GameContent() {
                 </p>
                 {!motionPermissionGranted && !showPermissionInstructions && (
                   <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
-                    <p>Er verschijnt een popup bovenaan je scherm. Klik op "Toestaan" om schudden in te schakelen.</p>
+                    <p>Er verschijnt een popup bovenaan je scherm. Klik op &quot;Toestaan&quot; om schudden in te schakelen.</p>
                     <p className="text-[#0A294F] font-semibold mt-2">Als er geen popup verschijnt:</p>
                     <p>Ga naar Instellingen → Safari → Beweging en toegang tot beweging toestaan</p>
                   </div>
@@ -1149,7 +1148,7 @@ function Play501GameContent() {
                 </p>
                 {!motionPermissionGranted && !showPermissionInstructions && !coinResult && (
                   <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
-                    <p>Er verschijnt een popup bovenaan je scherm. Klik op "Toestaan" om schudden in te schakelen.</p>
+                    <p>Er verschijnt een popup bovenaan je scherm. Klik op &quot;Toestaan&quot; om schudden in te schakelen.</p>
                     <p className="text-[#0A294F] font-semibold mt-2">Als er geen popup verschijnt:</p>
                     <p>Ga naar Instellingen → Safari → Beweging en toegang tot beweging toestaan</p>
                   </div>
