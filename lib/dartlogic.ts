@@ -9,6 +9,13 @@ export type DartStats = {
     doublesThrown: number;
 
     oneEighties: number;
+    
+    highestScore: number;
+    highestFinish: number;
+    scores140Plus: number;
+    scores100Plus: number;
+    scores80Plus: number;
+    legDarts: number[]; // Array van darts per leg voor beste/slechtste leg berekening
 };
 
 export const createInitialStats = (): DartStats => ({
@@ -22,6 +29,13 @@ export const createInitialStats = (): DartStats => ({
     doublesThrown: 0,
 
     oneEighties: 0,
+    
+    highestScore: 0,
+    highestFinish: 0,
+    scores140Plus: 0,
+    scores100Plus: 0,
+    scores80Plus: 0,
+    legDarts: [],
 });
 
 
@@ -42,6 +56,25 @@ export const registerTurn = (
 
     if (turnScore === 180) {
         updated.oneEighties++;
+    }
+
+    // Track highest score
+    if (turnScore > updated.highestScore) {
+        updated.highestScore = turnScore;
+    }
+
+    // Track score ranges
+    // 140+: 140-179
+    if (turnScore >= 140 && turnScore < 180) {
+        updated.scores140Plus++;
+    }
+    // 100+: 100-139
+    if (turnScore >= 100 && turnScore < 140) {
+        updated.scores100Plus++;
+    }
+    // 80+: 80-99
+    if (turnScore >= 80 && turnScore < 100) {
+        updated.scores80Plus++;
     }
 
     return updated;
