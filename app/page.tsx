@@ -24,9 +24,9 @@ export default function Home() {
       icon: "/achievements.png",
     },
     {
-      text: "Uitslagen Profs",
-      subtext: "Bekijk de uitslagen van de profs",
-      icon: "/tv.png",
+      text: "Profielen",
+      subtext: "beheer hier al je aangemaakte profielen",
+      icon: "/profiles.png",
     },
   ];
 

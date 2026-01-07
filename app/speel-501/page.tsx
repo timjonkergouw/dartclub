@@ -48,7 +48,6 @@ export default function Speel501() {
         return;
       }
 
-      console.log("Attempting to create profile:", { username: name.trim() });
       const { data, error } = await supabase.from("profiles").insert({ username: name.trim() }).select();
 
       if (error) {
@@ -76,7 +75,6 @@ export default function Speel501() {
       }
 
       if (data && data[0]) {
-        console.log("Profile created successfully:", data[0]);
         setSelectedPlayers([...selectedPlayers, data[0]]);
         setName("");
         fetchProfiles();

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import {
   createInitialStats,
   registerTurn,
@@ -76,6 +77,8 @@ function Play501GameContent() {
   const [selectedOrder, setSelectedOrder] = useState<Player[]>([]);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
+  const [currentWheelRotation, setCurrentWheelRotation] = useState(0); // For live updates during spinning
+  const [currentWheelPlayer, setCurrentWheelPlayer] = useState<Player | null>(null);
   const [coinFlipping, setCoinFlipping] = useState(false);
   const [coinResult, setCoinResult] = useState<"heads" | "tails" | null>(null);
   const [coinRotation, setCoinRotation] = useState(0);
@@ -85,6 +88,8 @@ function Play501GameContent() {
   const [showStartingPlayerPopup, setShowStartingPlayerPopup] = useState(false);
   const [startingPlayer, setStartingPlayer] = useState<Player | null>(null);
   const [hasShaken, setHasShaken] = useState(false);
+  const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const popupShownRef = useRef(false);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -505,7 +510,6 @@ function Play501GameContent() {
       });
 
       await Promise.all(statsPromises);
-      console.log("Game stats opgeslagen!");
     } catch (error) {
       console.error("Error saving game stats:", error);
     }
@@ -608,8 +612,32 @@ function Play501GameContent() {
     const totalRotation = wheelRotation + (spins * 360) + randomRotation;
     setWheelRotation(totalRotation);
 
+    // Simulate rotation during spinning for live updates
+    const startRotation = wheelRotation;
+    const duration = 3000; // 3 seconds
+    const startTime = Date.now();
+
+    const updateRotation = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out function for smooth deceleration
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentRotation = startRotation + (totalRotation - startRotation) * easeOut;
+      setCurrentWheelRotation(currentRotation);
+
+      if (progress < 1) {
+        requestAnimationFrame(updateRotation);
+      } else {
+        setCurrentWheelRotation(totalRotation);
+      }
+    };
+
+    setCurrentWheelRotation(startRotation);
+    requestAnimationFrame(updateRotation);
+
     setTimeout(() => {
       setWheelSpinning(false);
+      setCurrentWheelRotation(totalRotation);
       // Calculate which player is selected based on final rotation
       // The pointer is at the top (0 degrees), so we need to account for the rotation
       const normalizedRotation = totalRotation % 360;
@@ -641,17 +669,25 @@ function Play501GameContent() {
       setLegStartingPlayerIndex(0);
       setSetStartingPlayerIndex(0);
 
-      // Show popup with starting player
-      setStartingPlayer(reorderedPlayers[0]);
-      setShowStartingPlayerPopup(true);
+      // Only show popup if start popup is still open and popup hasn't been shown yet
+      if (showStartPopup && !popupShownRef.current) {
+        popupShownRef.current = true; // Mark popup as shown
+        setStartingPlayer(reorderedPlayers[0]);
+        setShowStartingPlayerPopup(true);
 
-      // Close popups after showing starting player
-      setTimeout(() => {
-        setShowStartingPlayerPopup(false);
+        // Close popups after showing starting player
+        popupTimeoutRef.current = setTimeout(() => {
+          setShowStartingPlayerPopup(false);
+          setShowStartPopup(false);
+          popupShownRef.current = false; // Reset flag
+          popupTimeoutRef.current = null;
+        }, 2000);
+      } else {
+        // If popup shouldn't be shown, just close the start popup
         setShowStartPopup(false);
-      }, 2000);
+      }
     }, 3000);
-  }, [wheelSpinning, wheelRotation, players, gameStates]);
+  }, [wheelSpinning, wheelRotation, players, gameStates, showStartPopup]);
 
   const flipCoin = useCallback(() => {
     if (coinFlipping) return;
@@ -692,22 +728,29 @@ function Play501GameContent() {
         setSetStartingPlayerIndex(1);
       }
 
-      // Show popup with starting player
-      setStartingPlayer(players[startingPlayerIndex]);
-      setShowStartingPlayerPopup(true);
+      // Only show popup if start popup is still open and popup hasn't been shown yet
+      if (showStartPopup && !popupShownRef.current) {
+        popupShownRef.current = true; // Mark popup as shown
+        setStartingPlayer(players[startingPlayerIndex]);
+        setShowStartingPlayerPopup(true);
 
-      // Close popups after showing starting player
-      setTimeout(() => {
-        setShowStartingPlayerPopup(false);
+        // Close popups after showing starting player
+        popupTimeoutRef.current = setTimeout(() => {
+          setShowStartingPlayerPopup(false);
+          setShowStartPopup(false);
+          popupShownRef.current = false; // Reset flag
+          popupTimeoutRef.current = null;
+        }, 2000);
+      } else {
+        // If popup shouldn't be shown, just close the start popup
         setShowStartPopup(false);
-      }, 2000);
+      }
     }, 2000);
-  }, [coinFlipping, coinRotation, players]);
+  }, [coinFlipping, coinRotation, players, showStartPopup]);
 
   // Function to request device motion permission (must be called in user gesture context)
   const requestMotionPermission = async () => {
     if (typeof window === "undefined") {
-      console.log("Window not available");
       return false;
     }
 
@@ -719,13 +762,8 @@ function Play501GameContent() {
     }
 
     if (typeof DeviceMotionEvent === "undefined") {
-      console.log("DeviceMotionEvent not supported in this browser");
       return false;
     }
-
-    console.log("Checking device motion permission...");
-    console.log("User agent:", navigator.userAgent);
-    console.log("Protocol:", window.location.protocol);
 
     const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
       requestPermission?: () => Promise<PermissionState>;
@@ -734,26 +772,21 @@ function Play501GameContent() {
     // Check if permission request is available (iOS 13+)
     if (typeof DeviceMotionEventWithPerm.requestPermission === "function") {
       try {
-        console.log("Permission request function found - requesting permission...");
         setShowPermissionInstructions(true);
 
         // Request permission - this should show a native popup on iOS
         const permission = await DeviceMotionEventWithPerm.requestPermission();
 
-        console.log("Permission result received:", permission);
         setShowPermissionInstructions(false);
 
         if (permission === "granted") {
-          console.log("Permission granted! Motion detection enabled.");
           setMotionPermissionGranted(true);
           return true;
         } else if (permission === "denied") {
-          console.log("Permission denied by user");
           setMotionPermissionGranted(false);
           alert("Toestemming geweigerd. Je kunt nog steeds op de knop klikken om handmatig te flippen/draaien.\n\nOm schudden in te schakelen, ga naar Instellingen > Safari > Beweging en toegang tot beweging toestaan.");
           return false;
         } else {
-          console.log("Permission prompt dismissed or not granted:", permission);
           setMotionPermissionGranted(false);
           return false;
         }
@@ -766,11 +799,32 @@ function Play501GameContent() {
       }
     } else {
       // No permission required (Android, older iOS, or desktop)
-      console.log("No permission required for device motion - enabling directly");
       setMotionPermissionGranted(true);
       return true;
     }
   };
+
+  // Calculate current player based on wheel rotation (for live indicator)
+  useEffect(() => {
+    if (startMethod !== "wheel" || players.length === 0) {
+      setCurrentWheelPlayer(null);
+      return;
+    }
+
+    const calculateCurrentPlayer = (rotation: number) => {
+      const normalizedRotation = rotation % 360;
+      const degreesPerPlayer = 360 / players.length;
+      // The pointer is at the top (0 degrees), so we need to account for the rotation
+      // Since the wheel rotates, we need to reverse the calculation
+      let selectedIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
+      if (selectedIndex < 0) selectedIndex += players.length;
+      return players[selectedIndex];
+    };
+
+    // Use currentWheelRotation for live updates during spinning, otherwise use wheelRotation
+    const rotationToUse = wheelSpinning ? currentWheelRotation : wheelRotation;
+    setCurrentWheelPlayer(calculateCurrentPlayer(rotationToUse));
+  }, [currentWheelRotation, wheelRotation, players, wheelSpinning, startMethod]);
 
   // Reset states when startMethod changes or popup opens
   useEffect(() => {
@@ -781,6 +835,8 @@ function Play501GameContent() {
       setCoinResult(null);
       setShakeDetectionReady(false);
       setHasShaken(false); // Reset shake state
+      setCurrentWheelPlayer(null); // Reset current wheel player
+      setCurrentWheelRotation(0); // Reset current wheel rotation
 
       // Small delay before enabling shake detection to prevent accidental triggers
       const timer = setTimeout(() => {
@@ -876,34 +932,19 @@ function Play501GameContent() {
       if (isShake) {
         lastShakeTime = currentTime;
 
-        console.log("Shake detected!", {
-          totalDelta,
-          accelerationMagnitude,
-          threshold: shakeThreshold,
-          deltaThreshold: deltaThreshold,
-          platform: isIOS ? "iOS" : isAndroid ? "Android" : "Unknown",
-          startMethod,
-          wheelSpinning,
-          coinFlipping,
-          hasShaken,
-          shakeDetectionReady,
-          x, y, z
-        });
+        // Shake detected - removed verbose logging for performance
 
         // Mark that user has actually shaken the device (first shake)
         if (!hasShaken && shakeDetectionReady) {
           setHasShaken(true);
-          console.log("First shake detected - ready to trigger on next shake");
           return; // Don't trigger on first shake, wait for second shake
         }
 
         // Only trigger if shake detection is ready AND user has already shaken once
         if (shakeDetectionReady && hasShaken) {
           if (startMethod === "wheel" && !wheelSpinning) {
-            console.log("Spinning wheel via shake");
             spinWheel();
           } else if (startMethod === "coin" && !coinFlipping && players.length === 2) {
-            console.log("Flipping coin via shake");
             flipCoin();
           }
         }
@@ -912,13 +953,11 @@ function Play501GameContent() {
 
     const setupDeviceMotion = async () => {
       if (listenerAdded) {
-        console.log("Listener already added");
         return;
       }
 
       // Check if DeviceMotionEvent is available
       if (typeof DeviceMotionEvent === "undefined") {
-        console.log("DeviceMotionEvent is not supported");
         return;
       }
 
@@ -930,7 +969,6 @@ function Play501GameContent() {
       try {
         // If permission is already granted (from button click), add listener directly
         if (motionPermissionGranted || typeof DeviceMotionEventWithPerm.requestPermission !== "function") {
-          console.log("Adding device motion listener (permission already granted or not required)");
           window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
           listenerAdded = true;
           if (!motionPermissionGranted) {
@@ -938,15 +976,12 @@ function Play501GameContent() {
           }
         } else {
           // Try to request permission (but this might not work if not in user gesture)
-          console.log("Attempting to request permission in useEffect...");
           const permission = await DeviceMotionEventWithPerm.requestPermission();
           if (permission === "granted") {
             window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
             listenerAdded = true;
             setMotionPermissionGranted(true);
-            console.log("Device motion permission granted and listener added");
           } else {
-            console.log("Device motion permission denied in useEffect");
             setMotionPermissionGranted(false);
           }
         }
@@ -954,11 +989,9 @@ function Play501GameContent() {
         console.error("Error setting up device motion:", error);
         // Try to add listener anyway for browsers that don't require permission
         try {
-          console.log("Trying to add listener without permission check...");
           window.addEventListener("devicemotion", handleDeviceMotion, { passive: true });
           listenerAdded = true;
           setMotionPermissionGranted(true);
-          console.log("Device motion listener added (fallback)");
         } catch (e) {
           console.error("Failed to add device motion listener:", e);
           setMotionPermissionGranted(false);
@@ -1136,30 +1169,19 @@ function Play501GameContent() {
                 </div>
               </div>
 
-              {/* Player names display box */}
-              <div className="bg-[#E8F0FF] rounded-xl p-4 mb-4">
-                <div className="text-center mb-2">
-                  <p className="text-sm font-semibold text-[#000000] mb-2">Spelers op het rad:</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {players.map((player, i) => {
-                      const colors = ["#28C7D8", "#E8F0FF", "#0A294F", "#D0E0FF", "#22a8b7", "#7E838F"];
-                      const color = colors[i % colors.length];
-                      return (
-                        <div
-                          key={player.id}
-                          className="px-3 py-1 rounded-lg text-sm font-semibold"
-                          style={{
-                            backgroundColor: color,
-                            color: color === "#0A294F" || color === "#7E838F" ? "white" : "#000000",
-                          }}
-                        >
-                          {player.username}
-                        </div>
-                      );
-                    })}
+              {/* Live indicator - shows current player being pointed at */}
+              {currentWheelPlayer && (
+                <div className="bg-[#E8F0FF] rounded-xl p-6 mb-4 border-2 border-[#0A294F]">
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-[#7E838F] mb-2 uppercase tracking-wide">
+                      {wheelSpinning ? "Draait..." : "Winnaar"}
+                    </p>
+                    <h3 className="text-2xl font-bold text-[#000000]">
+                      {currentWheelPlayer.username}
+                    </h3>
                   </div>
                 </div>
-              </div>
+              )}
               <div className="text-center mb-4">
                 <p className="text-sm text-[#7E838F]">
                   {wheelSpinning
@@ -1305,13 +1327,15 @@ function Play501GameContent() {
 
           {/* Logo rechtsboven */}
           <div>
-            <Image
-              src="/logo wit dartclub.png"
-              alt="DartClub Logo"
-              width={50}
-              height={50}
-              className="object-contain"
-            />
+            <Link href="/">
+              <Image
+                src="/logo wit dartclub.png"
+                alt="DartClub Logo"
+                width={50}
+                height={50}
+                className="object-contain cursor-pointer hover:opacity-80 transition-opacity"
+              />
+            </Link>
           </div>
         </div>
 

@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "clean": "rmdir /s /q .next 2>nul || rm -rf .next || true"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
