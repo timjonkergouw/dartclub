@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
     // Number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
   },
+  // Reduce file system operations during development
+  experimental: {
+    optimizePackageImports: ['@supabase/supabase-js'],
+  },
+  // Turbopack configuration to prevent ENOENT errors (moved from experimental.turbo)
+  turbopack: {
+    resolveAlias: {},
+  },
 };
 
 export default nextConfig;

@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:no-cache": "next dev --turbopack --no-turbo",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "clean": "rmdir /s /q .next 2>nul || rm -rf .next || true"
+    "clean": "rmdir /s /q .next 2>nul || rm -rf .next || true",
+    "dev:clean": "npm run clean && npm run dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",

@@ -1345,22 +1345,29 @@ function Play501GameContent() {
           <div className="flex mb-6 rounded-2xl overflow-hidden relative">
             {/* Speler 1 - Links */}
             <div className="flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8]">
-              <div className="text-center relative z-10">
-                <div className="font-semibold text-lg mb-2 text-white">
+              <div className="relative z-10 h-full flex flex-col">
+                {/* Naam linksboven */}
+                <div className="font-semibold text-xl mb-3 text-white text-left">
                   {gameStates[0].player.username}
                 </div>
-                <div className="text-5xl font-bold mb-2 text-white">
-                  {gameStates[0].score}
-                </div>
-                <div className="rounded-lg px-3 py-1 mb-2 inline-block bg-[#EEEEEE]">
-                  <div className="text-sm font-bold text-[#000000]">
-                    Legs: {gameStates[0].legsWon}
+                {/* Score en Legs/Sets op dezelfde regel */}
+                <div className="flex items-center justify-between flex-1">
+                  {/* Score links */}
+                  <div className="text-5xl font-bold text-white">
+                    {gameStates[0].score}
                   </div>
-                  <div className="text-sm font-bold text-[#000000]">
-                    Sets: {gameStates[0].setsWon}
+                  {/* Legs en Sets rechts */}
+                  <div className="text-white text-right">
+                    <div className="text-lg font-bold">
+                      L {gameStates[0].legsWon}
+                    </div>
+                    <div className="text-lg font-bold">
+                      S {gameStates[0].setsWon}
+                    </div>
                   </div>
                 </div>
-                <div className="text-xs space-y-1 text-white/80">
+                {/* Statistieken links onderin */}
+                <div className="text-xs space-y-1 text-white/80 text-left mt-6">
                   <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
                   <div>Darts: {gameStates[0].totalDarts}</div>
                   <div>Laatst: {gameStates[0].lastScore}</div>
@@ -1370,22 +1377,29 @@ function Play501GameContent() {
 
             {/* Speler 2 - Rechts */}
             <div className="flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE]">
-              <div className="text-center relative z-10">
-                <div className="font-semibold text-lg mb-2 text-[#000000]">
+              <div className="relative z-10 h-full flex flex-col">
+                {/* Naam linksboven */}
+                <div className="font-semibold text-xl mb-3 text-[#000000] text-left">
                   {gameStates[1].player.username}
                 </div>
-                <div className="text-5xl font-bold mb-2 text-[#000000]">
-                  {gameStates[1].score}
-                </div>
-                <div className="rounded-lg px-3 py-1 mb-2 inline-block bg-[#28C7D8]">
-                  <div className="text-sm font-bold text-white">
-                    Legs: {gameStates[1].legsWon}
+                {/* Score en Legs/Sets op dezelfde regel */}
+                <div className="flex items-center justify-between flex-1">
+                  {/* Score links */}
+                  <div className="text-5xl font-bold text-[#000000]">
+                    {gameStates[1].score}
                   </div>
-                  <div className="text-sm font-bold text-white">
-                    Sets: {gameStates[1].setsWon}
+                  {/* Legs en Sets rechts */}
+                  <div className="text-[#000000] text-right">
+                    <div className="text-lg font-bold">
+                      L {gameStates[1].legsWon}
+                    </div>
+                    <div className="text-lg font-bold">
+                      S {gameStates[1].setsWon}
+                    </div>
                   </div>
                 </div>
-                <div className="text-xs space-y-1 text-[#7E838F]">
+                {/* Statistieken links onderin */}
+                <div className="text-xs space-y-1 text-[#7E838F] text-left mt-6">
                   <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
                   <div>Darts: {gameStates[1].totalDarts}</div>
                   <div>Laatst: {gameStates[1].lastScore}</div>
