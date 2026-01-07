@@ -82,6 +82,9 @@ function Play501GameContent() {
   const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
   const [showPermissionInstructions, setShowPermissionInstructions] = useState(false);
   const [shakeDetectionReady, setShakeDetectionReady] = useState(false);
+  const [showStartingPlayerPopup, setShowStartingPlayerPopup] = useState(false);
+  const [startingPlayer, setStartingPlayer] = useState<Player | null>(null);
+  const [hasShaken, setHasShaken] = useState(false);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -638,7 +641,15 @@ function Play501GameContent() {
       setLegStartingPlayerIndex(0);
       setSetStartingPlayerIndex(0);
       
-      setShowStartPopup(false);
+      // Show popup with starting player
+      setStartingPlayer(reorderedPlayers[0]);
+      setShowStartingPlayerPopup(true);
+      
+      // Close popups after showing starting player
+      setTimeout(() => {
+        setShowStartingPlayerPopup(false);
+        setShowStartPopup(false);
+      }, 2000);
     }, 3000);
   }, [wheelSpinning, wheelRotation, players, gameStates]);
 
@@ -668,21 +679,30 @@ function Play501GameContent() {
       setCoinFlipping(false);
       
       // Assign based on coin flip
+      let startingPlayerIndex: number;
       if (result === "heads") {
+        startingPlayerIndex = 0;
         setCurrentPlayerIndex(0);
         setLegStartingPlayerIndex(0);
         setSetStartingPlayerIndex(0);
       } else {
+        startingPlayerIndex = 1;
         setCurrentPlayerIndex(1);
         setLegStartingPlayerIndex(1);
         setSetStartingPlayerIndex(1);
       }
       
+      // Show popup with starting player
+      setStartingPlayer(players[startingPlayerIndex]);
+      setShowStartingPlayerPopup(true);
+      
+      // Close popups after showing starting player
       setTimeout(() => {
+        setShowStartingPlayerPopup(false);
         setShowStartPopup(false);
-      }, 1500);
+      }, 2000);
     }, 2000);
-  }, [coinFlipping, coinRotation]);
+  }, [coinFlipping, coinRotation, players]);
 
   // Function to request device motion permission (must be called in user gesture context)
   const requestMotionPermission = async () => {
@@ -760,15 +780,17 @@ function Play501GameContent() {
       setCoinFlipping(false);
       setCoinResult(null);
       setShakeDetectionReady(false);
+      setHasShaken(false); // Reset shake state
       
       // Small delay before enabling shake detection to prevent accidental triggers
       const timer = setTimeout(() => {
         setShakeDetectionReady(true);
-      }, 500);
+      }, 1000);
       
       return () => clearTimeout(timer);
     } else {
       setShakeDetectionReady(false);
+      setHasShaken(false);
     }
   }, [showStartPopup, startMethod]);
 
@@ -842,11 +864,20 @@ function Play501GameContent() {
           startMethod, 
           wheelSpinning, 
           coinFlipping,
+          hasShaken,
+          shakeDetectionReady,
           x, y, z
         });
         
-        // Only trigger if shake detection is ready (prevents accidental triggers on menu open)
-        if (shakeDetectionReady) {
+        // Mark that user has actually shaken the device (first shake)
+        if (!hasShaken && shakeDetectionReady) {
+          setHasShaken(true);
+          console.log("First shake detected - ready to trigger on next shake");
+          return; // Don't trigger on first shake, wait for second shake
+        }
+        
+        // Only trigger if shake detection is ready AND user has already shaken once
+        if (shakeDetectionReady && hasShaken) {
           if (startMethod === "wheel" && !wheelSpinning) {
             console.log("Spinning wheel via shake");
             spinWheel();
@@ -933,7 +964,7 @@ function Play501GameContent() {
       window.removeEventListener("devicemotion", handleDeviceMotion);
       listenerAdded = false;
     };
-  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel, motionPermissionGranted, shakeDetectionReady]);
+  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel, motionPermissionGranted, shakeDetectionReady, hasShaken]);
 
   if (typeof window === "undefined" || players.length === 0 || gameStates.length === 0) {
     return (
@@ -944,6 +975,27 @@ function Play501GameContent() {
   }
 
   const isTwoPlayers = players.length === 2;
+
+  // Starting Player Popup
+  if (showStartingPlayerPopup && startingPlayer) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0A294F] bg-opacity-90 p-4">
+        <div className="bg-[#E8F0FF] rounded-2xl p-8 shadow-2xl w-full max-w-md text-center">
+          <div className="mb-6">
+            <div className="w-24 h-24 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-4xl mx-auto mb-4">
+              {startingPlayer.username.charAt(0).toUpperCase()}
+            </div>
+            <h2 className="text-2xl font-bold text-[#000000] mb-2">
+              {startingPlayer.username} begint!
+            </h2>
+            <p className="text-sm text-[#7E838F]">
+              De speler die mag beginnen
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Start Popup
   if (showStartPopup) {

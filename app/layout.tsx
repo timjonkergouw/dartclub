@@ -35,13 +35,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "DartClub",
   },
-  themeColor: "#0A294F",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  themeColor: "#0A294F",
 };
 
 export default function RootLayout({
