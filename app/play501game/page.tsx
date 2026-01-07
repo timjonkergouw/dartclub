@@ -89,7 +89,7 @@ function Play501GameContent() {
   useEffect(() => {
     if (!searchParams) return;
     if (typeof window === "undefined") return;
-    
+
     const playersParam = searchParams.get("players");
     const modeParam = searchParams.get("mode");
     const typeParam = searchParams.get("type");
@@ -105,7 +105,7 @@ function Play501GameContent() {
           }
           return;
         }
-        
+
         setPlayers(parsedPlayers);
         setGameMode((modeParam as "first-to" | "best-of") || "first-to");
         setGameType((typeParam as "sets" | "legs") || "legs");
@@ -192,7 +192,7 @@ function Play501GameContent() {
     // Update stats met dubbel tracking
     const currentPlayerId = currentState.player.id;
     const currentPlayerStat = updatedStatsCopy.get(currentPlayerId) || createInitialStats();
-    
+
     // doublesHit = 1 als de speler heeft uitgegooid (maar dat is hier niet het geval, dus 0)
     // doublesThrown = aantal pijlen op dubbel
     const updatedStat = registerDoubleAttempt(currentPlayerStat, doubleDarts, 0);
@@ -229,7 +229,7 @@ function Play501GameContent() {
     if (trackDoubles) {
       const currentPlayerId = currentState.player.id;
       const currentPlayerStat = updatedStatsCopy.get(currentPlayerId) || createInitialStats();
-      
+
       // Bij uitgooien: doublesHit = 1 (de laatste pijl op dubbel), doublesThrown = checkoutDarts
       // Maar we moeten alleen de laatste pijl tellen als hit, de rest als thrown
       const updatedStat = registerDoubleAttempt(currentPlayerStat, checkoutDarts, 1);
@@ -268,7 +268,7 @@ function Play501GameContent() {
       // Set gewonnen!
       updatedStatesCopy[currentPlayerIndex].setsWon += 1;
       setWon = true;
-      
+
       // Reset alle legs naar 0 voor nieuwe set
       updatedStatesCopy.forEach((state) => {
         state.legsWon = 0;
@@ -413,7 +413,7 @@ function Play501GameContent() {
             num = parseInt(numpadMatch[1]);
           }
         }
-        
+
         if (num !== null && !isNaN(num)) {
           // Check of dit nummer een mogelijke optie is
           if (pendingDoubleCheckout.possibleDartsOnDouble.includes(num)) {
@@ -447,7 +447,7 @@ function Play501GameContent() {
           num = parseInt(numpadMatch[1]);
         }
       }
-      
+
       if (num !== null && !isNaN(num)) {
         setInputScore((prev) => {
           if (prev.length < 3) {
@@ -516,23 +516,23 @@ function Play501GameContent() {
     // Ga terug naar de vorige state in de geschiedenis
     if (gameHistory.length > 0) {
       const previousState = gameHistory[gameHistory.length - 1];
-      
+
       // Herstel de game states
       setGameStates(previousState.gameStates);
-      
+
       // Herstel de player stats
       setPlayerStats(previousState.playerStats);
-      
+
       // Herstel de current player index
       setCurrentPlayerIndex(previousState.currentPlayerIndex);
-      
+
       // Herstel de starting player indices
       setLegStartingPlayerIndex(previousState.legStartingPlayerIndex);
       setSetStartingPlayerIndex(previousState.setStartingPlayerIndex);
-      
+
       // Verwijder de laatste entry uit de geschiedenis
       setGameHistory(gameHistory.slice(0, -1));
-      
+
       // Reset input en popups
       setInputScore("");
       setShowCheckoutPopup(false);
@@ -618,33 +618,33 @@ function Play501GameContent() {
       // The selected player is the one at the top (0 degrees) after rotation
       let selectedIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
       if (selectedIndex < 0) selectedIndex += players.length;
-      
+
       const selectedPlayer = players[selectedIndex];
       const playerIndex = players.findIndex(p => p.id === selectedPlayer.id);
-      
+
       // Reorder players so selected player is first
       const reorderedPlayers = [
         ...players.slice(playerIndex),
         ...players.slice(0, playerIndex)
       ];
       setPlayers(reorderedPlayers);
-      
+
       // Reorder game states to match
       const reorderedStates = [
         ...gameStates.slice(playerIndex),
         ...gameStates.slice(0, playerIndex)
       ];
       setGameStates(reorderedStates);
-      
+
       // Set the starting player (now at index 0 after reordering)
       setCurrentPlayerIndex(0);
       setLegStartingPlayerIndex(0);
       setSetStartingPlayerIndex(0);
-      
+
       // Show popup with starting player
       setStartingPlayer(reorderedPlayers[0]);
       setShowStartingPlayerPopup(true);
-      
+
       // Close popups after showing starting player
       setTimeout(() => {
         setShowStartingPlayerPopup(false);
@@ -658,7 +658,7 @@ function Play501GameContent() {
     setCoinFlipping(true);
     setCoinResult(null); // Reset result before flipping
     const result = Math.random() < 0.5 ? "heads" : "tails";
-    
+
     // Calculate end rotation: start from current rotation, add 5 full rotations (1800deg)
     // plus the result offset (0deg for heads, 180deg for tails)
     // This ensures smooth transition to final position
@@ -666,10 +666,10 @@ function Play501GameContent() {
     const baseDegrees = baseRotations * 360; // 1800deg
     const resultOffset = result === "heads" ? 0 : 180;
     const endRotation = coinRotation + baseDegrees + resultOffset;
-    
+
     // Set the rotation immediately to start the animation
     setCoinRotation(endRotation);
-    
+
     // After animation completes, set result and stop flipping
     setTimeout(() => {
       // Normalize rotation to 0-360 range for display
@@ -677,7 +677,7 @@ function Play501GameContent() {
       setCoinRotation(normalizedRotation);
       setCoinResult(result);
       setCoinFlipping(false);
-      
+
       // Assign based on coin flip
       let startingPlayerIndex: number;
       if (result === "heads") {
@@ -691,11 +691,11 @@ function Play501GameContent() {
         setLegStartingPlayerIndex(1);
         setSetStartingPlayerIndex(1);
       }
-      
+
       // Show popup with starting player
       setStartingPlayer(players[startingPlayerIndex]);
       setShowStartingPlayerPopup(true);
-      
+
       // Close popups after showing starting player
       setTimeout(() => {
         setShowStartingPlayerPopup(false);
@@ -710,14 +710,14 @@ function Play501GameContent() {
       console.log("Window not available");
       return false;
     }
-    
+
     // Check if page is loaded over HTTPS (required for iOS)
     if (window.location.protocol !== "https:" && window.location.hostname !== "localhost" && !window.location.hostname.startsWith("127.0.0.1")) {
       console.warn("Device motion requires HTTPS (or localhost)");
       alert("Voor schudden is een beveiligde verbinding (HTTPS) nodig. De app werkt nog steeds, maar schudden is niet beschikbaar.");
       return false;
     }
-    
+
     if (typeof DeviceMotionEvent === "undefined") {
       console.log("DeviceMotionEvent not supported in this browser");
       return false;
@@ -726,7 +726,7 @@ function Play501GameContent() {
     console.log("Checking device motion permission...");
     console.log("User agent:", navigator.userAgent);
     console.log("Protocol:", window.location.protocol);
-    
+
     const DeviceMotionEventWithPerm = DeviceMotionEvent as unknown as {
       requestPermission?: () => Promise<PermissionState>;
     };
@@ -736,13 +736,13 @@ function Play501GameContent() {
       try {
         console.log("Permission request function found - requesting permission...");
         setShowPermissionInstructions(true);
-        
+
         // Request permission - this should show a native popup on iOS
         const permission = await DeviceMotionEventWithPerm.requestPermission();
-        
+
         console.log("Permission result received:", permission);
         setShowPermissionInstructions(false);
-        
+
         if (permission === "granted") {
           console.log("Permission granted! Motion detection enabled.");
           setMotionPermissionGranted(true);
@@ -781,12 +781,12 @@ function Play501GameContent() {
       setCoinResult(null);
       setShakeDetectionReady(false);
       setHasShaken(false); // Reset shake state
-      
+
       // Small delay before enabling shake detection to prevent accidental triggers
       const timer = setTimeout(() => {
         setShakeDetectionReady(true);
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     } else {
       setShakeDetectionReady(false);
@@ -801,24 +801,26 @@ function Play501GameContent() {
     if (!shakeDetectionReady) return; // Don't detect shakes until ready
 
     let lastShakeTime = 0;
-    
+
     // Detect device type for platform-specific thresholds
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isAndroid = /Android/.test(navigator.userAgent);
-    
+
     // Platform-specific thresholds
     // iPhone is more sensitive, needs higher threshold (26-32)
     // Android needs lower threshold (20-25)
     const shakeThreshold = isIOS ? 29 : isAndroid ? 22 : 25; // Default to Android-like if unknown
     const deltaThreshold = isIOS ? 8 : isAndroid ? 5 : 6; // Delta threshold also platform-specific
-    
+
     let listenerAdded = false;
 
     // Store previous acceleration values for better shake detection
-    let lastX = 0;
-    let lastY = 0;
-    let lastZ = 0;
+    let lastX: number | null = null;
+    let lastY: number | null = null;
+    let lastZ: number | null = null;
+    let eventCount = 0;
+    const calibrationEvents = 5; // Ignore first 5 events for calibration
 
     const handleDeviceMotion = (event: DeviceMotionEvent) => {
       // Try accelerationIncludingGravity first (Android), then acceleration (iOS)
@@ -826,56 +828,75 @@ function Play501GameContent() {
       if (!acceleration || acceleration.x === null || acceleration.y === null || acceleration.z === null) {
         acceleration = event.acceleration;
       }
-      
+
       if (!acceleration) return;
       const { x, y, z } = acceleration;
       if (x === null || y === null || z === null) return;
-      
+
+      eventCount++;
+
+      // Calibration: use first few events to set baseline, don't detect shakes yet
+      // This prevents false positives from the initial jump from 0 to actual values
+      if (eventCount <= calibrationEvents) {
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        return; // Don't process shake detection during calibration
+      }
+
+      // Only calculate delta if we have previous values (should always be true after calibration)
+      if (lastX === null || lastY === null || lastZ === null) {
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        return;
+      }
+
       // Calculate change in acceleration (better for shake detection)
       const deltaX = Math.abs(x - lastX);
       const deltaY = Math.abs(y - lastY);
       const deltaZ = Math.abs(z - lastZ);
       const totalDelta = deltaX + deltaY + deltaZ;
-      
+
       // Also calculate acceleration magnitude
       const accelerationMagnitude = Math.sqrt(x * x + y * y + z * z);
-      
+
       // Update last values
       lastX = x;
       lastY = y;
       lastZ = z;
-      
+
       const currentTime = Date.now();
       const timeSinceLastShake = currentTime - lastShakeTime;
-      
+
       // Use both delta and magnitude for better detection
       // Platform-specific thresholds ensure appropriate sensitivity
       const isShake = (totalDelta > deltaThreshold || accelerationMagnitude > shakeThreshold) && timeSinceLastShake > 800;
-      
+
       if (isShake) {
         lastShakeTime = currentTime;
-        
-        console.log("Shake detected!", { 
-          totalDelta, 
-          accelerationMagnitude, 
+
+        console.log("Shake detected!", {
+          totalDelta,
+          accelerationMagnitude,
           threshold: shakeThreshold,
           deltaThreshold: deltaThreshold,
           platform: isIOS ? "iOS" : isAndroid ? "Android" : "Unknown",
-          startMethod, 
-          wheelSpinning, 
+          startMethod,
+          wheelSpinning,
           coinFlipping,
           hasShaken,
           shakeDetectionReady,
           x, y, z
         });
-        
+
         // Mark that user has actually shaken the device (first shake)
         if (!hasShaken && shakeDetectionReady) {
           setHasShaken(true);
           console.log("First shake detected - ready to trigger on next shake");
           return; // Don't trigger on first shake, wait for second shake
         }
-        
+
         // Only trigger if shake detection is ready AND user has already shaken once
         if (shakeDetectionReady && hasShaken) {
           if (startMethod === "wheel" && !wheelSpinning) {
@@ -1060,11 +1081,10 @@ function Play501GameContent() {
                           handleBullsOrder(player);
                         }
                       }}
-                      className={`w-full py-3 px-4 rounded-lg text-left transition-all duration-150 ${
-                        isSelected
-                          ? "bg-[#0A294F] text-white"
-                          : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                      }`}
+                      className={`w-full py-3 px-4 rounded-lg text-left transition-all duration-150 ${isSelected
+                        ? "bg-[#0A294F] text-white"
+                        : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold">{player.username}</span>
@@ -1115,7 +1135,7 @@ function Play501GameContent() {
                   <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-[#0A294F]" />
                 </div>
               </div>
-              
+
               {/* Player names display box */}
               <div className="bg-[#E8F0FF] rounded-xl p-4 mb-4">
                 <div className="text-center mb-2">
@@ -1142,13 +1162,13 @@ function Play501GameContent() {
               </div>
               <div className="text-center mb-4">
                 <p className="text-sm text-[#7E838F]">
-                  {wheelSpinning 
-                    ? "Radje draait..." 
+                  {wheelSpinning
+                    ? "Radje draait..."
                     : showPermissionInstructions
-                    ? "Wacht op toestemmingsvenster..."
-                    : motionPermissionGranted
-                    ? "Schud je telefoon of klik op draaien"
-                    : "Klik op draaien om toestemming te geven voor schudden"}
+                      ? "Wacht op toestemmingsvenster..."
+                      : motionPermissionGranted
+                        ? "Schud je telefoon of klik op draaien"
+                        : "Klik op draaien om toestemming te geven voor schudden"}
                 </p>
                 {!motionPermissionGranted && !showPermissionInstructions && (
                   <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
@@ -1182,7 +1202,7 @@ function Play501GameContent() {
               <h3 className="text-lg font-semibold text-[#000000] mb-4 text-center">
                 Coin flip
               </h3>
-              <div 
+              <div
                 className="relative w-48 h-48 mx-auto mb-4"
                 style={{
                   perspective: "1000px",
@@ -1193,8 +1213,8 @@ function Play501GameContent() {
                   style={{
                     transformStyle: "preserve-3d",
                     transform: `rotateY(${coinRotation}deg)`,
-                    transition: coinFlipping 
-                      ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)" 
+                    transition: coinFlipping
+                      ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)"
                       : "transform 0s",
                   }}
                 >
@@ -1210,7 +1230,7 @@ function Play501GameContent() {
                     <div className="text-xs mb-1">KOP</div>
                     <div className="text-lg">{players[0].username}</div>
                   </div>
-                  
+
                   {/* Tails side - Player 2 */}
                   <div
                     className="absolute inset-0 rounded-full border-4 border-[#0A294F] bg-[#0A294F] flex flex-col items-center justify-center text-white font-bold"
@@ -1230,12 +1250,12 @@ function Play501GameContent() {
                   {coinFlipping
                     ? "Munt draait..."
                     : coinResult
-                    ? `${coinResult === "heads" ? players[0].username : players[1].username} begint!`
-                    : showPermissionInstructions
-                    ? "Wacht op toestemmingsvenster..."
-                    : motionPermissionGranted
-                    ? "Schud je telefoon of klik op flippen"
-                    : "Klik op flippen om toestemming te geven voor schudden"}
+                      ? `${coinResult === "heads" ? players[0].username : players[1].username} begint!`
+                      : showPermissionInstructions
+                        ? "Wacht op toestemmingsvenster..."
+                        : motionPermissionGranted
+                          ? "Schud je telefoon of klik op flippen"
+                          : "Klik op flippen om toestemming te geven voor schudden"}
                 </p>
                 {!motionPermissionGranted && !showPermissionInstructions && !coinResult && (
                   <div className="text-xs text-[#7E838F] mt-2 px-4 space-y-1">
@@ -1582,31 +1602,28 @@ function Play501GameContent() {
               <div className="flex gap-3 mb-6">
                 <button
                   onClick={() => setCheckoutDarts(1)}
-                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
-                    checkoutDarts === 1
-                      ? "bg-[#0A294F] text-[#E8F0FF]"
-                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                  }`}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${checkoutDarts === 1
+                    ? "bg-[#0A294F] text-[#E8F0FF]"
+                    : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                    }`}
                 >
                   1
                 </button>
                 <button
                   onClick={() => setCheckoutDarts(2)}
-                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
-                    checkoutDarts === 2
-                      ? "bg-[#0A294F] text-[#E8F0FF]"
-                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                  }`}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${checkoutDarts === 2
+                    ? "bg-[#0A294F] text-[#E8F0FF]"
+                    : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                    }`}
                 >
                   2
                 </button>
                 <button
                   onClick={() => setCheckoutDarts(3)}
-                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
-                    checkoutDarts === 3
-                      ? "bg-[#0A294F] text-[#E8F0FF]"
-                      : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                  }`}
+                  className={`flex-1 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${checkoutDarts === 3
+                    ? "bg-[#0A294F] text-[#E8F0FF]"
+                    : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                    }`}
                 >
                   3
                 </button>
@@ -1660,11 +1677,10 @@ function Play501GameContent() {
                     <button
                       key={num}
                       onClick={() => setDoubleDarts(num)}
-                      className={`w-20 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${
-                        doubleDarts === num
-                          ? "bg-[#0A294F] text-[#E8F0FF]"
-                          : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                      }`}
+                      className={`w-20 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${doubleDarts === num
+                        ? "bg-[#0A294F] text-[#E8F0FF]"
+                        : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                        }`}
                     >
                       {num}
                     </button>
@@ -1712,11 +1728,10 @@ function Play501GameContent() {
                   return (
                     <div
                       key={state.player.id}
-                      className={`rounded-xl p-4 ${
-                        idx === 0
-                          ? "bg-[#28C7D8] text-white"
-                          : "bg-white text-[#000000]"
-                      }`}
+                      className={`rounded-xl p-4 ${idx === 0
+                        ? "bg-[#28C7D8] text-white"
+                        : "bg-white text-[#000000]"
+                        }`}
                     >
                       <div className="text-center mb-4">
                         <h3 className="font-bold text-lg mb-1">
