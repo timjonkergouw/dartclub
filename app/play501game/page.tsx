@@ -81,6 +81,7 @@ function Play501GameContent() {
   const [coinRotation, setCoinRotation] = useState(0);
   const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
   const [showPermissionInstructions, setShowPermissionInstructions] = useState(false);
+  const [shakeDetectionReady, setShakeDetectionReady] = useState(false);
 
   useEffect(() => {
     if (!searchParams) return;
@@ -751,10 +752,31 @@ function Play501GameContent() {
     }
   };
 
+  // Reset states when startMethod changes or popup opens
+  useEffect(() => {
+    if (showStartPopup && startMethod) {
+      // Reset spinning/flipping states when menu opens
+      setWheelSpinning(false);
+      setCoinFlipping(false);
+      setCoinResult(null);
+      setShakeDetectionReady(false);
+      
+      // Small delay before enabling shake detection to prevent accidental triggers
+      const timer = setTimeout(() => {
+        setShakeDetectionReady(true);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setShakeDetectionReady(false);
+    }
+  }, [showStartPopup, startMethod]);
+
   // Device motion for shake detection
   useEffect(() => {
     if (!showStartPopup) return;
     if (typeof window === "undefined") return;
+    if (!shakeDetectionReady) return; // Don't detect shakes until ready
 
     let lastShakeTime = 0;
     
@@ -823,12 +845,15 @@ function Play501GameContent() {
           x, y, z
         });
         
-        if (startMethod === "wheel" && !wheelSpinning) {
-          console.log("Spinning wheel via shake");
-          spinWheel();
-        } else if (startMethod === "coin" && !coinFlipping && players.length === 2) {
-          console.log("Flipping coin via shake");
-          flipCoin();
+        // Only trigger if shake detection is ready (prevents accidental triggers on menu open)
+        if (shakeDetectionReady) {
+          if (startMethod === "wheel" && !wheelSpinning) {
+            console.log("Spinning wheel via shake");
+            spinWheel();
+          } else if (startMethod === "coin" && !coinFlipping && players.length === 2) {
+            console.log("Flipping coin via shake");
+            flipCoin();
+          }
         }
       }
     };
@@ -908,7 +933,7 @@ function Play501GameContent() {
       window.removeEventListener("devicemotion", handleDeviceMotion);
       listenerAdded = false;
     };
-  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel, motionPermissionGranted]);
+  }, [showStartPopup, startMethod, wheelSpinning, coinFlipping, players.length, flipCoin, spinWheel, motionPermissionGranted, shakeDetectionReady]);
 
   if (typeof window === "undefined" || players.length === 0 || gameStates.length === 0) {
     return (
