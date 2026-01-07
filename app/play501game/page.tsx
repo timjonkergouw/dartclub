@@ -757,7 +757,18 @@ function Play501GameContent() {
     if (typeof window === "undefined") return;
 
     let lastShakeTime = 0;
-    const shakeThreshold = 12; // Lower threshold for better iOS compatibility
+    
+    // Detect device type for platform-specific thresholds
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    // Platform-specific thresholds
+    // iPhone is more sensitive, needs higher threshold (26-32)
+    // Android needs lower threshold (20-25)
+    const shakeThreshold = isIOS ? 29 : isAndroid ? 22 : 25; // Default to Android-like if unknown
+    const deltaThreshold = isIOS ? 8 : isAndroid ? 5 : 6; // Delta threshold also platform-specific
+    
     let listenerAdded = false;
 
     // Store previous acceleration values for better shake detection
@@ -794,8 +805,8 @@ function Play501GameContent() {
       const timeSinceLastShake = currentTime - lastShakeTime;
       
       // Use both delta and magnitude for better detection
-      // Lower threshold for delta (change detection) works better on iOS
-      const isShake = (totalDelta > 3 || accelerationMagnitude > shakeThreshold) && timeSinceLastShake > 800;
+      // Platform-specific thresholds ensure appropriate sensitivity
+      const isShake = (totalDelta > deltaThreshold || accelerationMagnitude > shakeThreshold) && timeSinceLastShake > 800;
       
       if (isShake) {
         lastShakeTime = currentTime;
@@ -803,6 +814,9 @@ function Play501GameContent() {
         console.log("Shake detected!", { 
           totalDelta, 
           accelerationMagnitude, 
+          threshold: shakeThreshold,
+          deltaThreshold: deltaThreshold,
+          platform: isIOS ? "iOS" : isAndroid ? "Android" : "Unknown",
           startMethod, 
           wheelSpinning, 
           coinFlipping,

@@ -34,23 +34,85 @@ export default function Speel501() {
     }
     setIsLoading(true);
     try {
+      // Check if Supabase is properly configured
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        console.error("Supabase environment variables missing:", {
+          hasUrl: !!supabaseUrl,
+          hasKey: !!supabaseKey,
+        });
+        alert("Database configuratie ontbreekt. Controleer of de environment variables correct zijn ingesteld.");
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("Attempting to create profile:", { username: name.trim() });
       const { data, error } = await supabase.from("profiles").insert({ username: name.trim() }).select();
+
       if (error) {
         console.error("Supabase error:", error);
-        alert(`Fout bij aanmaken profiel: ${error.message || JSON.stringify(error)}`);
+        console.error("Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        let errorMessage = error.message || "Onbekende fout";
+
+        // Provide more helpful error messages
+        if (error.code === "PGRST301" || error.message?.includes("permission denied")) {
+          errorMessage = "Geen toestemming om profiel aan te maken. Controleer de database policies.";
+        } else if (error.message?.includes("duplicate key") || error.code === "23505") {
+          errorMessage = "Deze gebruikersnaam bestaat al. Kies een andere naam.";
+        } else if (error.message?.includes("violates row-level security")) {
+          errorMessage = "Row Level Security policy blokkeert deze actie. Controleer de Supabase policies.";
+        }
+
+        alert(`Fout bij aanmaken profiel: ${errorMessage}`);
         throw error;
       }
+
       if (data && data[0]) {
+        console.log("Profile created successfully:", data[0]);
         setSelectedPlayers([...selectedPlayers, data[0]]);
         setName("");
         fetchProfiles();
         setModalMode("select");
         setIsModalOpen(false);
+      } else {
+        console.warn("No data returned from insert");
+        alert("Profiel aangemaakt maar geen data ontvangen. Probeer opnieuw.");
       }
     } catch (error: unknown) {
       console.error("Error creating profile:", error);
-      const errorMessage = error instanceof Error ? error.message : (error as { error_description?: string })?.error_description || "Onbekende fout";
-      alert(`Er is een fout opgetreden bij het aanmaken van het profiel: ${errorMessage}`);
+
+      let errorMessage = "Onbekende fout";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Handle network/fetch errors specifically
+        if (error.message === "Failed to fetch" || error.name === "TypeError") {
+          errorMessage = "Kan geen verbinding maken met de database. Controleer:\n" +
+            "1. Of je internetverbinding werkt\n" +
+            "2. Of de Supabase URL correct is ingesteld\n" +
+            "3. Of CORS correct is geconfigureerd in Supabase\n" +
+            "4. Of de database online is";
+
+          console.error("Network error detected. Check:", {
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+            hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          });
+        }
+      } else if (typeof error === "object" && error !== null) {
+        const err = error as { error_description?: string; message?: string };
+        errorMessage = err.error_description || err.message || "Onbekende fout";
+      }
+
+      alert(`Er is een fout opgetreden bij het aanmaken van het profiel:\n${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +135,23 @@ export default function Speel501() {
 
     try {
       const { data, error } = await supabase.from("profiles").select("*");
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching profiles:", error);
+        console.error("Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        // Don't show alert for fetch errors, just log them
+        return;
+      }
       setProfiles(data || []);
     } catch (error) {
       console.error("Error fetching profiles:", error);
+      if (error instanceof Error && error.message === "Failed to fetch") {
+        console.error("Network error when fetching profiles. Check Supabase configuration.");
+      }
     }
   };
 
