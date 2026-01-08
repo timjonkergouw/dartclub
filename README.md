@@ -75,11 +75,25 @@ Slaat spelstatistieken op:
 - id: integer (primary key, auto-increment)
 - game_id: text (uniek per spel)
 - player_id: integer (foreign key naar profiles)
-- average_score: numeric
-- highest_score: integer
-- checkout_percentage: numeric
-- double_percentage: numeric
-- ... (andere statistiek velden)
+- three_dart_avg: numeric (3-dart gemiddelde)
+- first9_avg: numeric (first 9 gemiddelde)
+- finish: integer (laatste finish score)
+- highest_finish: integer (hoogste finish)
+- doubles_hit: integer (aantal doubles geraakt)
+- doubles_thrown: integer (aantal doubles gegooid)
+- checkout_percentage: numeric (checkout percentage)
+- double_percentage: numeric (double percentage)
+- highest_score: integer (hoogste score)
+- one_eighties: integer (aantal 180's)
+- scores_140_plus: integer (aantal scores 140+)
+- scores_100_plus: integer (aantal scores 100+)
+- scores_80_plus: integer (aantal scores 80+)
+- total_turns: integer (totaal aantal beurten)
+- total_darts: integer (totaal aantal darts)
+- leg_darts: jsonb (array van aantal darts per leg)
+- best_leg: integer (beste leg - minste darts)
+- worst_leg: integer (slechtste leg - meeste darts)
+- legs_played: integer (aantal gespeelde legs)
 - created_at: timestamp
 ```
 
@@ -109,12 +123,31 @@ CREATE TABLE dart_stats (
   id SERIAL PRIMARY KEY,
   game_id TEXT NOT NULL,
   player_id INTEGER REFERENCES profiles(id) ON DELETE CASCADE,
-  average_score NUMERIC,
-  highest_score INTEGER,
+  -- Averages
+  three_dart_avg NUMERIC,
+  first9_avg NUMERIC,
+  -- Finish statistics
+  finish INTEGER,
+  highest_finish INTEGER,
+  -- Double statistics
+  doubles_hit INTEGER,
+  doubles_thrown INTEGER,
   checkout_percentage NUMERIC,
   double_percentage NUMERIC,
+  -- Score statistics
+  highest_score INTEGER,
+  one_eighties INTEGER,
+  scores_140_plus INTEGER,
+  scores_100_plus INTEGER,
+  scores_80_plus INTEGER,
+  -- Turn and dart statistics
   total_turns INTEGER,
   total_darts INTEGER,
+  -- Leg statistics
+  leg_darts JSONB, -- Array van aantal darts per leg
+  best_leg INTEGER,
+  worst_leg INTEGER,
+  legs_played INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

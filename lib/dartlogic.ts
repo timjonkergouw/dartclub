@@ -96,14 +96,52 @@ export const registerDoubleAttempt = (
 
 export const calculateFinalStats = (
     stats: DartStats,
-    finishScore: number
+    finishScore: number,
+    totalDarts: number
 ) => {
+    // Bereken percentages
+    const checkoutPercentage = stats.doublesThrown > 0 
+        ? (stats.doublesHit / stats.doublesThrown) * 100 
+        : 0;
+    
+    const doublePercentage = stats.doublesThrown > 0
+        ? (stats.doublesHit / stats.doublesThrown) * 100
+        : 0;
+
+    // Bereken beste en slechtste leg uit legDarts array
+    const bestLeg = stats.legDarts.length > 0 ? Math.min(...stats.legDarts) : null;
+    const worstLeg = stats.legDarts.length > 0 ? Math.max(...stats.legDarts) : null;
+
     return {
+        // Averages
         three_dart_avg: stats.totalTurns > 0 ? stats.totalScore / stats.totalTurns : 0,
         first9_avg: stats.first9Turns > 0 ? stats.first9Score / stats.first9Turns : 0,
+        
+        // Finish
         finish: finishScore,
+        highest_finish: stats.highestFinish,
+        
+        // Doubles
         doubles_hit: stats.doublesHit,
         doubles_thrown: stats.doublesThrown,
+        checkout_percentage: checkoutPercentage,
+        double_percentage: doublePercentage,
+        
+        // Scores
+        highest_score: stats.highestScore,
         one_eighties: stats.oneEighties,
+        scores_140_plus: stats.scores140Plus,
+        scores_100_plus: stats.scores100Plus,
+        scores_80_plus: stats.scores80Plus,
+        
+        // Turns and darts
+        total_turns: stats.totalTurns,
+        total_darts: totalDarts,
+        
+        // Leg statistics
+        leg_darts: stats.legDarts, // JSON array
+        best_leg: bestLeg,
+        worst_leg: worstLeg,
+        legs_played: stats.legDarts.length,
     };
 };

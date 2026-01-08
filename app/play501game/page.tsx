@@ -17,6 +17,7 @@ import { calculateCheckoutInfo } from "@/lib/checkout";
 interface Player {
   id: number;
   username: string;
+  avatar_url?: string | null;
 }
 
 interface PlayerGameState {
@@ -42,7 +43,6 @@ function Play501GameContent() {
   const [gameType, setGameType] = useState<"sets" | "legs">("legs");
   const [target, setTarget] = useState(1);
   const [playerStats, setPlayerStats] = useState<Map<number, DartStats>>(new Map());
-  const [gameId, setGameId] = useState<string>("");
   const [showBustPopup, setShowBustPopup] = useState(false);
   const [showInvalidScorePopup, setShowInvalidScorePopup] = useState(false);
   const [legStartingPlayerIndex, setLegStartingPlayerIndex] = useState(0);
@@ -135,8 +135,10 @@ function Play501GameContent() {
         });
         setPlayerStats(initialStats);
 
-        // Generate unique game ID
-        setGameId(`game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+        // Reset finishGame ref en lock voor nieuwe game
+        finishGameRef.current = null;
+        finishGameLockRef.current = false;
+        finishGameTriggeredRef.current = false;
 
         // Initialize starting players
         setLegStartingPlayerIndex(0);
@@ -461,8 +463,8 @@ function Play501GameContent() {
     if (gameWon) {
       // Game finished - save stats and show end screen
       setWinner(updatedStatesCopy[currentPlayerIndex]);
-      finishGame(updatedStatesCopy, updatedStatsCopy);
       setShowGameFinished(true);
+      // finishGame wordt aangeroepen via useEffect om dubbele aanroep te voorkomen
     } else if (setWon) {
       // Nieuwe set begint - start met de nieuwe set starting player
       setCurrentPlayerIndex(newSetStartingPlayerIndex);
@@ -474,7 +476,6 @@ function Play501GameContent() {
     setGameStates(updatedStatesCopy);
     setPlayerStats(updatedStatsCopy);
     setInputScore("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPlayerIndex, legStartingPlayerIndex, setStartingPlayerIndex, gameType, gameMode, target, trackDoubles, players.length]);
 
   const handleSubmit = useCallback(() => {
@@ -512,6 +513,13 @@ function Play501GameContent() {
 
     if (newScore < 0) {
       // Bust: score te hoog
+      handleBust();
+      return;
+    }
+
+    // Check of je op 1 uitkomt (kan niet finishen, geen dubbel 1/2)
+    if (newScore === 1) {
+      // Bust: kan niet finishen vanaf 1
       handleBust();
       return;
     }
@@ -752,6 +760,9 @@ function Play501GameContent() {
     };
   }, [showGameFinished, showDoublePopup, showBustPopup, showInvalidScorePopup, pendingDoubleCheckout, doubleDarts, inputScore, handleSubmit, confirmDoubleCheckout]);
 
+  const finishGameRef = useRef<string | null>(null); // Sla game UUID op om dubbele aanroep te voorkomen
+  const finishGameLockRef = useRef<boolean>(false); // Lock om race conditions te voorkomen
+
   const finishGame = async (
     finalStates: PlayerGameState[],
     finalStats: Map<number, DartStats>
@@ -759,39 +770,161 @@ function Play501GameContent() {
     // Only execute on client side
     if (typeof window === "undefined") return;
 
+    // Voorkom dubbele aanroep - check of we al bezig zijn of al een game UUID hebben
+    if (finishGameLockRef.current) {
+      console.log("finishGame already in progress, skipping...");
+      return;
+    }
+
+    if (finishGameRef.current) {
+      console.log("finishGame already called for game:", finishGameRef.current, "- skipping...");
+      return;
+    }
+
+    // Zet lock DIRECT om race conditions te voorkomen
+    finishGameLockRef.current = true;
+    console.log("🔒 finishGame lock acquired");
+
     try {
+      // Maak eerst een game record aan in de games tabel
+      const { data: gameData, error: gameError } = await supabase
+        .from("games")
+        .insert({
+          profile_id: finalStates[0]?.player.id, // Gebruik eerste speler als game owner
+          ended_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (gameError) {
+        console.error("Error creating game record:", {
+          code: gameError.code,
+          message: gameError.message,
+          details: gameError.details,
+          hint: gameError.hint,
+        });
+        // Reset lock bij error
+        finishGameLockRef.current = false;
+        return;
+      }
+
+      const gameUuid = gameData.id;
+      console.log("🎮 Created game record:", gameUuid);
+
+      // Sla game UUID op om dubbele aanroep te voorkomen
+      finishGameRef.current = gameUuid;
+
+      // Helper functie om null/undefined waarden te filteren en NaN te vervangen
+      const cleanValue = (value: unknown): string | number | boolean | null => {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'number' && isNaN(value)) return null;
+        if (typeof value === 'number' && !isFinite(value)) return null;
+        return value as string | number | boolean;
+      };
+
       // Save stats for each player
       const statsPromises = finalStates.map(async (state) => {
         const playerStat = finalStats.get(state.player.id);
         if (!playerStat) return;
 
-        const finalStatsData = calculateFinalStats(playerStat, state.lastScore);
+        // Bereken totale darts: som van alle legDarts of totalDarts * 3 (als legDarts leeg is)
+        const totalDarts = playerStat.legDarts.length > 0
+          ? playerStat.legDarts.reduce((sum, darts) => sum + darts, 0)
+          : state.totalDarts;
 
-        const { error } = await supabase.from("dart_stats").insert({
-          game_id: gameId,
-          player_id: state.player.id,
-          ...finalStatsData,
+        const finalStatsData = calculateFinalStats(playerStat, state.lastScore, totalDarts);
+
+        console.log(`📊 Saving stats for player ${state.player.id} (${state.player.username}):`, {
+          finish: finalStatsData.finish,
+          game_id: gameUuid,
+          lastScore: state.lastScore,
+          legsWon: state.legsWon
         });
 
+        // Filter null/undefined/NaN waarden en maak insertData object
+        const insertData: Record<string, string | number | boolean | null | number[]> = {
+          game_id: gameUuid,
+          player_id: state.player.id,
+        };
+
+        // Voeg alle stats toe, maar filter null/NaN waarden
+        Object.entries(finalStatsData).forEach(([key, value]) => {
+          const cleanedValue = cleanValue(value);
+          if (cleanedValue !== null) {
+            insertData[key] = cleanedValue;
+          }
+        });
+
+        // Check eerst of er al een record bestaat voor deze game_id en player_id
+        const { data: existingData, error: checkError } = await supabase
+          .from("dart_stats")
+          .select("id")
+          .eq("game_id", gameUuid)
+          .eq("player_id", state.player.id)
+          .maybeSingle();
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error(`❌ Error checking existing stats for player ${state.player.id}:`, checkError);
+        }
+
+        // Als er al een record bestaat, skip insert
+        if (existingData) {
+          console.log(`⚠️ Stats already exist for player ${state.player.id} in game ${gameUuid}, skipping insert`);
+          return;
+        }
+
+        const { data, error } = await supabase.from("dart_stats").insert(insertData).select();
+
         if (error) {
-          console.error(`Error saving stats for player ${state.player.id}:`, error);
+          console.error(`❌ Error saving stats for player ${state.player.id}:`);
+          console.error(`   Code:`, error.code);
+          console.error(`   Message:`, error.message);
+          console.error(`   Details:`, error.details);
+          console.error(`   Hint:`, error.hint);
+          console.error(`   Insert Data:`, JSON.stringify(insertData, null, 2));
+        } else {
+          console.log(`✅ Successfully saved stats for player ${state.player.id}:`, data);
         }
       });
 
       await Promise.all(statsPromises);
+      console.log("✅ All stats saved for game:", gameUuid);
     } catch (error) {
       console.error("Error saving game stats:", error);
+      // Reset lock bij error
+      finishGameLockRef.current = false;
+      finishGameRef.current = null;
+    } finally {
+      // Release lock
+      finishGameLockRef.current = false;
+      console.log("🔓 finishGame lock released");
     }
   };
 
-  // Roep finishGame aan wanneer showGameFinished true wordt
+  // Roep finishGame aan wanneer showGameFinished true wordt (maar alleen 1x)
+  const finishGameTriggeredRef = useRef(false);
+
   useEffect(() => {
-    if (showGameFinished && winner && gameStates.length > 0) {
+    // Reset trigger ref wanneer game niet meer finished is
+    if (!showGameFinished) {
+      finishGameTriggeredRef.current = false;
+      return;
+    }
+
+    if (showGameFinished && winner && gameStates.length > 0 && !finishGameRef.current && !finishGameLockRef.current && !finishGameTriggeredRef.current) {
+      finishGameTriggeredRef.current = true; // Zet DIRECT om race conditions te voorkomen
+      console.log("🚀 Triggering finishGame from useEffect");
       const finalStats = new Map<number, DartStats>();
       playerStats.forEach((stats, playerId) => {
         finalStats.set(playerId, stats);
       });
-      finishGame(gameStates, finalStats).catch(console.error);
+      finishGame(gameStates, finalStats).catch((error) => {
+        console.error("Error in finishGame:", error);
+        // Reset ref en lock bij error zodat het opnieuw kan worden geprobeerd
+        finishGameRef.current = null;
+        finishGameLockRef.current = false;
+        finishGameTriggeredRef.current = false;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showGameFinished, winner]);
@@ -884,19 +1017,49 @@ function Play501GameContent() {
   const spinWheel = useCallback(() => {
     if (wheelSpinning) return;
     setWheelSpinning(true);
-    const spins = 5 + Math.random() * 5; // 5-10 spins
-    const randomRotation = Math.random() * 360;
-    const totalRotation = wheelRotation + (spins * 360) + randomRotation;
-    setWheelRotation(totalRotation);
+
+    // Gebruik crypto.getRandomValues voor betere random (als beschikbaar)
+    const getRandom = () => {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        return array[0] / (0xFFFFFFFF + 1);
+      }
+      return Math.random();
+    };
+
+    // EERST: Selecteer willekeurig een speler
+    const randomPlayerIndex = Math.floor(getRandom() * players.length);
+    const selectedPlayer = players[randomPlayerIndex];
+
+    console.log("🎯 Selected player index:", randomPlayerIndex, "Player:", selectedPlayer.username);
+
+    // Bereken de rotatie die nodig is om op deze speler uit te komen
+    // We gebruiken dezelfde logica als in de useEffect voor calculateCurrentPlayer
+    // De pointer staat bovenaan (0 graden), en het rad roteert met de klok mee
+    const degreesPerPlayer = 360 / players.length;
+
+    // Om speler i bovenaan te krijgen, moeten we roteren zodat:
+    // (360 - rotation) % 360 / degreesPerPlayer = i
+    // Dit betekent: rotation = 360 - (i * degreesPerPlayer) - (degreesPerPlayer / 2)
+    // We willen het midden van het segment, dus voegen we degreesPerPlayer / 2 toe
+    const targetRotation = 360 - ((randomPlayerIndex * degreesPerPlayer) + (degreesPerPlayer / 2));
+
+    // Voeg meerdere volledige rotaties toe voor een mooie animatie
+    const spins = 5 + getRandom() * 5; // 5-10 spins
+    // Bereken de totale rotatie: spins + targetRotation
+    const totalRotation = (spins * 360) + targetRotation;
+
+    console.log("🎡 Target rotation:", targetRotation, "Total rotation:", totalRotation);
 
     // Simulate rotation during spinning for live updates
-    const startRotation = wheelRotation;
-    const duration = 3000; // 3 seconds
+    const startRotation = 0;
+    const animationDuration = 3000; // 3 seconden animatie
     const startTime = Date.now();
 
     const updateRotation = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = Math.min(elapsed / animationDuration, 1);
       // Ease-out function for smooth deceleration
       const easeOut = 1 - Math.pow(1 - progress, 3);
       const currentRotation = startRotation + (totalRotation - startRotation) * easeOut;
@@ -910,49 +1073,48 @@ function Play501GameContent() {
     };
 
     setCurrentWheelRotation(startRotation);
+    setWheelRotation(totalRotation);
     requestAnimationFrame(updateRotation);
 
+    // Na 3 seconden: stop animatie en toon winnaar
     setTimeout(() => {
       setWheelSpinning(false);
       setCurrentWheelRotation(totalRotation);
-      // Calculate which player is selected based on final rotation
-      // The pointer is at the top (0 degrees), so we need to account for the rotation
-      const normalizedRotation = totalRotation % 360;
-      const degreesPerPlayer = 360 / players.length;
-      // Since the wheel rotates, we need to reverse the calculation
-      // The selected player is the one at the top (0 degrees) after rotation
-      let selectedIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
-      if (selectedIndex < 0) selectedIndex += players.length;
 
-      const selectedPlayer = players[selectedIndex];
-      const playerIndex = players.findIndex(p => p.id === selectedPlayer.id);
+      // Gebruik de oorspronkelijk geselecteerde speler index
+      // (De rotatie is al berekend om op deze speler uit te komen)
+      const finalPlayerIndex = randomPlayerIndex;
 
-      // Reorder players so selected player is first
+      console.log("✅ Using player index:", finalPlayerIndex, "Player:", players[finalPlayerIndex].username);
+
+      // Reorder players so selected player is first (bovenste/meest links)
       const reorderedPlayers = [
-        ...players.slice(playerIndex),
-        ...players.slice(0, playerIndex)
+        ...players.slice(finalPlayerIndex),
+        ...players.slice(0, finalPlayerIndex)
       ];
       setPlayers(reorderedPlayers);
 
       // Reorder game states to match
       const reorderedStates = [
-        ...gameStates.slice(playerIndex),
-        ...gameStates.slice(0, playerIndex)
+        ...gameStates.slice(finalPlayerIndex),
+        ...gameStates.slice(0, finalPlayerIndex)
       ];
       setGameStates(reorderedStates);
 
-      // Set the starting player (now at index 0 after reordering)
+      console.log("🏆 Winner:", reorderedPlayers[0].username, "will start the game");
+
+      // Set the starting player (now at index 0 after reordering) - dit is de winnaar
       setCurrentPlayerIndex(0);
       setLegStartingPlayerIndex(0);
       setSetStartingPlayerIndex(0);
 
-      // Only show popup if start popup is still open and popup hasn't been shown yet
+      // Toon popup met winnaar voor 2 seconden
       if (showStartPopup && !popupShownRef.current) {
         popupShownRef.current = true; // Mark popup as shown
         setStartingPlayer(reorderedPlayers[0]);
         setShowStartingPlayerPopup(true);
 
-        // Close popups after showing starting player
+        // Close popups after 2 seconden
         popupTimeoutRef.current = setTimeout(() => {
           setShowStartingPlayerPopup(false);
           setShowStartPopup(false);
@@ -963,31 +1125,45 @@ function Play501GameContent() {
         // If popup shouldn't be shown, just close the start popup
         setShowStartPopup(false);
       }
-    }, 3000);
-  }, [wheelSpinning, wheelRotation, players, gameStates, showStartPopup]);
+    }, animationDuration);
+  }, [wheelSpinning, players, gameStates, showStartPopup]);
 
   const flipCoin = useCallback(() => {
     if (coinFlipping) return;
     setCoinFlipping(true);
     setCoinResult(null); // Reset result before flipping
-    const result = Math.random() < 0.5 ? "heads" : "tails";
 
-    // Calculate end rotation: start from current rotation, add 5 full rotations (1800deg)
-    // plus the result offset (0deg for heads, 180deg for tails)
-    // This ensures smooth transition to final position
-    const baseRotations = 5; // 5 full rotations
-    const baseDegrees = baseRotations * 360; // 1800deg
+    // Gebruik crypto.getRandomValues voor betere random (als beschikbaar)
+    const getRandom = () => {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        return array[0] / (0xFFFFFFFF + 1);
+      }
+      return Math.random();
+    };
+
+    // EERST: Bepaal het resultaat volledig random
+    const result = getRandom() < 0.5 ? "heads" : "tails";
+
+    // Calculate end rotation: add random aantal extra rotaties voor meer variatie
+    // plus de result offset (0deg for heads, 180deg for tails)
+    const baseRotations = 5 + getRandom() * 3; // 5-8 full rotations voor meer variatie
+    const baseDegrees = baseRotations * 360;
     const resultOffset = result === "heads" ? 0 : 180;
-    const endRotation = coinRotation + baseDegrees + resultOffset;
+    // De eindrotatie moet exact op 0 of 180 graden eindigen (niet genormaliseerd)
+    const endRotation = baseDegrees + resultOffset;
 
     // Set the rotation immediately to start the animation
     setCoinRotation(endRotation);
 
+    const duration = 3000; // 3 seconds voor langzamere, vloeiendere animatie
+
     // After animation completes, set result and stop flipping
     setTimeout(() => {
-      // Normalize rotation to 0-360 range for display
-      const normalizedRotation = endRotation % 360;
-      setCoinRotation(normalizedRotation);
+      // Zet de rotatie op de exacte eindwaarde (0 of 180 graden, modulo 360)
+      const finalRotation = result === "heads" ? 0 : 180;
+      setCoinRotation(finalRotation);
       setCoinResult(result);
       setCoinFlipping(false);
 
@@ -1022,8 +1198,8 @@ function Play501GameContent() {
         // If popup shouldn't be shown, just close the start popup
         setShowStartPopup(false);
       }
-    }, 2000);
-  }, [coinFlipping, coinRotation, players, showStartPopup]);
+    }, duration);
+  }, [coinFlipping, players, showStartPopup]);
 
   // Function to request device motion permission (must be called in user gesture context)
   const requestMotionPermission = async () => {
@@ -1313,9 +1489,20 @@ function Play501GameContent() {
       <div className="min-h-screen flex items-center justify-center bg-[#0A294F] bg-opacity-90 p-4">
         <div className="bg-[#E8F0FF] rounded-2xl p-8 shadow-2xl w-full max-w-md text-center">
           <div className="mb-6">
-            <div className="w-24 h-24 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-4xl mx-auto mb-4">
-              {startingPlayer.username.charAt(0).toUpperCase()}
-            </div>
+            {startingPlayer.avatar_url ? (
+              <Image
+                src={startingPlayer.avatar_url}
+                alt={startingPlayer.username}
+                width={96}
+                height={96}
+                className="rounded-full object-cover mx-auto mb-4"
+                style={{ width: "96px", height: "96px" }}
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-4xl mx-auto mb-4">
+                {startingPlayer.username.charAt(0).toUpperCase()}
+              </div>
+            )}
             <h2 className="text-2xl font-bold text-[#000000] mb-2">
               {startingPlayer.username} begint!
             </h2>
@@ -1396,8 +1583,25 @@ function Play501GameContent() {
                         : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
                         }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold">{player.username}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {player.avatar_url ? (
+                            <Image
+                              src={player.avatar_url}
+                              alt={player.username}
+                              width={24}
+                              height={24}
+                              className="rounded-full object-cover"
+                              style={{ width: "24px", height: "24px" }}
+                            />
+                          ) : (
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-semibold text-xs ${isSelected ? "bg-[#28C7D8] text-white" : "bg-[#0A294F] text-white"
+                              }`}>
+                              {player.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-semibold">{player.username}</span>
+                        </div>
                         {isSelected && (
                           <span className="text-sm">#{orderIndex + 1}</span>
                         )}
@@ -1434,11 +1638,12 @@ function Play501GameContent() {
                 <div
                   className="absolute inset-0 rounded-full border-8 border-[#0A294F] transition-transform duration-3000 ease-out"
                   style={{
-                    transform: `rotate(${wheelRotation}deg)`,
+                    transform: `rotate(${wheelSpinning ? currentWheelRotation : wheelRotation}deg)`,
                     background: `conic-gradient(${players.map((_, i) => {
                       const colors = ["#28C7D8", "#E8F0FF", "#0A294F", "#D0E0FF", "#22a8b7", "#7E838F"];
                       return `${colors[i % colors.length]} ${(i / players.length) * 360}deg ${((i + 1) / players.length) * 360}deg`;
                     }).join(", ")})`,
+                    transition: wheelSpinning ? "none" : "transform 0s",
                   }}
                 />
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10">
@@ -1453,9 +1658,25 @@ function Play501GameContent() {
                     <p className="text-xs font-medium text-[#7E838F] mb-2 uppercase tracking-wide">
                       {wheelSpinning ? "Draait..." : "Winnaar"}
                     </p>
-                    <h3 className="text-2xl font-bold text-[#000000]">
-                      {currentWheelPlayer.username}
-                    </h3>
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      {currentWheelPlayer.avatar_url ? (
+                        <Image
+                          src={currentWheelPlayer.avatar_url}
+                          alt={currentWheelPlayer.username}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                          style={{ width: "40px", height: "40px" }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#0A294F] flex items-center justify-center text-white font-semibold text-lg">
+                          {currentWheelPlayer.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <h3 className="text-2xl font-bold text-[#000000]">
+                        {currentWheelPlayer.username}
+                      </h3>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1513,7 +1734,7 @@ function Play501GameContent() {
                     transformStyle: "preserve-3d",
                     transform: `rotateY(${coinRotation}deg)`,
                     transition: coinFlipping
-                      ? "transform 2s cubic-bezier(0.4, 0.0, 0.2, 1)"
+                      ? "transform 3s cubic-bezier(0.4, 0.0, 0.2, 1)"
                       : "transform 0s",
                   }}
                 >
@@ -1621,26 +1842,46 @@ function Play501GameContent() {
         {isTwoPlayers ? (
           <div className="flex mb-6 rounded-2xl overflow-hidden relative">
             {/* Speler 1 - Links */}
-            <div className="flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8]">
+            <div
+              className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+                }`}
+            >
               <div className="relative z-10 h-full flex flex-col">
                 {/* Naam linksboven */}
-                <div className="font-semibold text-xl mb-3 text-white text-left">
+                <div className="font-semibold text-xl mb-3 text-white text-left flex items-center gap-2">
+                  {0 === legStartingPlayerIndex && (
+                    <div className="w-4 h-4 rounded-full bg-white" />
+                  )}
+                  {gameStates[0].player.avatar_url ? (
+                    <Image
+                      src={gameStates[0].player.avatar_url}
+                      alt={gameStates[0].player.username}
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover"
+                      style={{ width: "32px", height: "32px" }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm">
+                      {gameStates[0].player.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   {gameStates[0].player.username}
                 </div>
                 {/* Score en Legs/Sets op dezelfde regel */}
-                <div className="flex items-center justify-between flex-1">
-                  {/* Score links */}
-                  <div className="text-5xl font-bold text-white">
-                    {gameStates[0].score}
-                  </div>
-                  {/* Legs en Sets rechts */}
-                  <div className="text-white text-right">
+                <div className="flex items-center justify-between gap-4 flex-1">
+                  {/* Legs en Sets links */}
+                  <div className="text-white text-left">
                     <div className="text-lg font-bold">
                       L {gameStates[0].legsWon}
                     </div>
                     <div className="text-lg font-bold">
                       S {gameStates[0].setsWon}
                     </div>
+                  </div>
+                  {/* Score rechts */}
+                  <div className="text-5xl font-bold text-white">
+                    {gameStates[0].score}
                   </div>
                 </div>
                 {/* Statistieken links onderin */}
@@ -1653,26 +1894,46 @@ function Play501GameContent() {
             </div>
 
             {/* Speler 2 - Rechts */}
-            <div className="flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE]">
+            <div
+              className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+                }`}
+            >
               <div className="relative z-10 h-full flex flex-col">
                 {/* Naam linksboven */}
-                <div className="font-semibold text-xl mb-3 text-[#000000] text-left">
+                <div className="font-semibold text-xl mb-3 text-[#000000] text-left flex items-center gap-2">
+                  {1 === legStartingPlayerIndex && (
+                    <div className="w-4 h-4 rounded-full bg-[#28C7D8]" />
+                  )}
+                  {gameStates[1].player.avatar_url ? (
+                    <Image
+                      src={gameStates[1].player.avatar_url}
+                      alt={gameStates[1].player.username}
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover"
+                      style={{ width: "32px", height: "32px" }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[#0A294F]/20 flex items-center justify-center text-[#0A294F] font-semibold text-sm">
+                      {gameStates[1].player.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   {gameStates[1].player.username}
                 </div>
                 {/* Score en Legs/Sets op dezelfde regel */}
-                <div className="flex items-center justify-between flex-1">
-                  {/* Score links */}
-                  <div className="text-5xl font-bold text-[#000000]">
-                    {gameStates[1].score}
-                  </div>
-                  {/* Legs en Sets rechts */}
-                  <div className="text-[#000000] text-right">
+                <div className="flex items-center justify-between gap-4 flex-1">
+                  {/* Legs en Sets links */}
+                  <div className="text-[#000000] text-left">
                     <div className="text-lg font-bold">
                       L {gameStates[1].legsWon}
                     </div>
                     <div className="text-lg font-bold">
                       S {gameStates[1].setsWon}
                     </div>
+                  </div>
+                  {/* Score rechts */}
+                  <div className="text-5xl font-bold text-[#000000]">
+                    {gameStates[1].score}
                   </div>
                 </div>
                 {/* Statistieken links onderin */}
@@ -1689,10 +1950,37 @@ function Play501GameContent() {
             {gameStates.map((state, index) => (
               <div
                 key={state.player.id}
-                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${index % 2 === 0 ? "bg-[#28C7D8]" : "bg-[#EEEEEE]"
+                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${index === currentPlayerIndex
+                  ? index % 2 === 0
+                    ? "bg-[#28C7D8] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-105"
+                    : "bg-[#EEEEEE] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-105"
+                  : index % 2 === 0
+                    ? "bg-[#28C7D8]"
+                    : "bg-[#EEEEEE]"
                   }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
+                  {index === legStartingPlayerIndex && (
+                    <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
+                      }`} />
+                  )}
+                  {state.player.avatar_url ? (
+                    <Image
+                      src={state.player.avatar_url}
+                      alt={state.player.username}
+                      width={28}
+                      height={28}
+                      className={`rounded-full object-cover ${players.length > 3 ? "hidden sm:block" : ""}`}
+                      style={{ width: "28px", height: "28px" }}
+                    />
+                  ) : (
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs ${index % 2 === 0 ? "bg-white/20 text-white" : "bg-[#0A294F]/20 text-[#0A294F]"
+                        } ${players.length > 3 ? "hidden sm:flex" : ""}`}
+                    >
+                      {state.player.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div
                     className={`font-semibold text-base ${index % 2 === 0 ? "text-white" : "text-[#000000]"
                       }`}
@@ -1705,29 +1993,27 @@ function Play501GameContent() {
                   >
                     3-dart avg: {calculateAverage(state)}
                   </div>
-                  <div
-                    className={`rounded px-2 py-0.5 ${index % 2 === 0 ? "bg-[#EEEEEE]" : "bg-[#28C7D8]"
-                      }`}
-                  >
-                    <div
-                      className={`text-xs font-bold ${index % 2 === 0 ? "text-[#000000]" : "text-white"
-                        }`}
-                    >
-                      Legs: {state.legsWon}
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                    }`}>
+                    {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
+                    <div className={players.length > 3 ? "block sm:hidden text-base" : "hidden"}>
+                      L {state.legsWon} · S {state.setsWon}
                     </div>
-                    <div
-                      className={`text-xs font-bold ${index % 2 === 0 ? "text-[#000000]" : "text-white"
-                        }`}
-                    >
-                      Sets: {state.setsWon}
+                    <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
+                      L {state.legsWon}
+                    </div>
+                    <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
+                      S {state.setsWon}
                     </div>
                   </div>
-                </div>
-                <div
-                  className={`text-2xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                    }`}
-                >
-                  {state.score}
+                  <div
+                    className={`text-2xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                      }`}
+                  >
+                    {state.score}
+                  </div>
                 </div>
               </div>
             ))}
@@ -1735,8 +2021,8 @@ function Play501GameContent() {
         )}
 
         {/* Wie is aan de beurt - onder het scorebord */}
-        <div className="text-white text-xl font-semibold mt-2">
-          {gameStates[currentPlayerIndex].player.username} is aan de beurt
+        <div className="text-white text-xl font-semibold mt-2 text-left">
+          {gameStates[currentPlayerIndex].player.username} is aan de beurt!
         </div>
       </div>
 
@@ -1967,7 +2253,24 @@ function Play501GameContent() {
                 {/* Winnaar header */}
                 <div className="text-center mb-6">
                   <h1 className="text-3xl font-bold text-[#000000] mb-2">
-                    {winner.player.username} heeft gewonnen!
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                      {winner.player.avatar_url ? (
+                        <Image
+                          src={winner.player.avatar_url}
+                          alt={winner.player.username}
+                          width={48}
+                          height={48}
+                          className="rounded-full object-cover"
+                          style={{ width: "48px", height: "48px" }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xl">
+                          {winner.player.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span>{winner.player.username}</span>
+                    </div>
+                    <span className="block">heeft gewonnen!</span>
                   </h1>
                   <p className="text-[#7E838F] text-sm">
                     {gameMode === "first-to" ? "First to" : "Best of"} {target} {gameType}
@@ -1980,11 +2283,43 @@ function Play501GameContent() {
                   <div className="flex justify-center items-center gap-4">
                     {gameStates.length >= 2 && (
                       <>
-                        <div className="text-white font-semibold text-base">{gameStates[0].player.username}</div>
+                        <div className="flex items-center gap-2 text-white font-semibold text-base">
+                          {gameStates[0].player.avatar_url ? (
+                            <Image
+                              src={gameStates[0].player.avatar_url}
+                              alt={gameStates[0].player.username}
+                              width={24}
+                              height={24}
+                              className="rounded-full object-cover"
+                              style={{ width: "24px", height: "24px" }}
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
+                              {gameStates[0].player.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {gameStates[0].player.username}
+                        </div>
                         <div className="text-[#28C7D8] font-bold text-3xl">
                           {gameType === "sets" ? gameStates[0].setsWon : gameStates[0].legsWon} - {gameType === "sets" ? gameStates[1].setsWon : gameStates[1].legsWon}
                         </div>
-                        <div className="text-white font-semibold text-base">{gameStates[1].player.username}</div>
+                        <div className="flex items-center gap-2 text-white font-semibold text-base">
+                          {gameStates[1].player.avatar_url ? (
+                            <Image
+                              src={gameStates[1].player.avatar_url}
+                              alt={gameStates[1].player.username}
+                              width={24}
+                              height={24}
+                              className="rounded-full object-cover"
+                              style={{ width: "24px", height: "24px" }}
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
+                              {gameStates[1].player.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {gameStates[1].player.username}
+                        </div>
                       </>
                     )}
                     {gameStates.length === 1 && (

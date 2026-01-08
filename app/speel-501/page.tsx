@@ -10,11 +10,11 @@ export default function Speel501() {
   const [setsLegs, setSetsLegs] = useState<"sets" | "legs">("sets");
   const [counter, setCounter] = useState(1);
   const [name, setName] = useState("");
-  const [profiles, setProfiles] = useState<{ id: number; username: string }[]>([]);
+  const [profiles, setProfiles] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"select" | "create">("select");
-  const [selectedPlayers, setSelectedPlayers] = useState<{ id: number; username: string }[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
   const [trackDoubles, setTrackDoubles] = useState(false);
 
   const incrementCounter = () => {
@@ -116,7 +116,7 @@ export default function Speel501() {
     }
   };
 
-  const selectPlayer = (player: { id: number; username: string }) => {
+  const selectPlayer = (player: { id: number; username: string; avatar_url?: string | null }) => {
     if (!selectedPlayers.find((p) => p.id === player.id)) {
       setSelectedPlayers([...selectedPlayers, player]);
     }
@@ -219,9 +219,20 @@ export default function Speel501() {
                 className="flex flex-col items-center gap-1 relative"
               >
                 <div className="relative">
-                  <div className="w-16 h-16 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-xl">
-                    {player.username.charAt(0).toUpperCase()}
-                  </div>
+                  {player.avatar_url ? (
+                    <Image
+                      src={player.avatar_url}
+                      alt={player.username}
+                      width={64}
+                      height={64}
+                      className="rounded-full object-cover"
+                      style={{ width: "64px", height: "64px" }}
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-xl">
+                      {player.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <button
                     onClick={() => removePlayer(player.id)}
                     className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs hover:bg-red-600 active:scale-95 transition-all"
@@ -325,9 +336,20 @@ export default function Speel501() {
                           }}
                           className="w-full flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
                         >
-                          <div className="w-12 h-12 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-lg shrink-0">
-                            {profile.username.charAt(0).toUpperCase()}
-                          </div>
+                          {profile.avatar_url ? (
+                            <Image
+                              src={profile.avatar_url}
+                              alt={profile.username}
+                              width={48}
+                              height={48}
+                              className="rounded-full object-cover shrink-0"
+                              style={{ width: "48px", height: "48px" }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-lg shrink-0">
+                              {profile.username.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <span className="text-[#000000] font-medium text-sm">
                             {profile.username}
                           </span>
