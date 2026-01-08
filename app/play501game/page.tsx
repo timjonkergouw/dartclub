@@ -1028,29 +1028,12 @@ function Play501GameContent() {
       return Math.random();
     };
 
-    // EERST: Selecteer willekeurig een speler
-    const randomPlayerIndex = Math.floor(getRandom() * players.length);
-    const selectedPlayer = players[randomPlayerIndex];
-
-    console.log("🎯 Selected player index:", randomPlayerIndex, "Player:", selectedPlayer.username);
-
-    // Bereken de rotatie die nodig is om op deze speler uit te komen
-    // We gebruiken dezelfde logica als in de useEffect voor calculateCurrentPlayer
-    // De pointer staat bovenaan (0 graden), en het rad roteert met de klok mee
-    const degreesPerPlayer = 360 / players.length;
-
-    // Om speler i bovenaan te krijgen, moeten we roteren zodat:
-    // (360 - rotation) % 360 / degreesPerPlayer = i
-    // Dit betekent: rotation = 360 - (i * degreesPerPlayer) - (degreesPerPlayer / 2)
-    // We willen het midden van het segment, dus voegen we degreesPerPlayer / 2 toe
-    const targetRotation = 360 - ((randomPlayerIndex * degreesPerPlayer) + (degreesPerPlayer / 2));
-
-    // Voeg meerdere volledige rotaties toe voor een mooie animatie
+    // Genereer een willekeurige rotatie (geen speler selectie vooraf)
+    // We bepalen de winnaar pas na de animatie op basis van de eindrotatie
+    // Dit zorgt ervoor dat de winnaar overeenkomt met wat de live preview toont
     const spins = 5 + getRandom() * 5; // 5-10 spins
-    // Bereken de totale rotatie: spins + targetRotation
-    const totalRotation = (spins * 360) + targetRotation;
-
-    console.log("🎡 Target rotation:", targetRotation, "Total rotation:", totalRotation);
+    const randomExtraRotation = getRandom() * 360; // Extra random rotatie voor variatie
+    const totalRotation = (spins * 360) + randomExtraRotation;
 
     // Simulate rotation during spinning for live updates
     const startRotation = 0;
@@ -1076,16 +1059,19 @@ function Play501GameContent() {
     setWheelRotation(totalRotation);
     requestAnimationFrame(updateRotation);
 
-    // Na 3 seconden: stop animatie en toon winnaar
+    // Na 3 seconden: stop animatie en bepaal winnaar op basis van eindrotatie
     setTimeout(() => {
       setWheelSpinning(false);
       setCurrentWheelRotation(totalRotation);
 
-      // Gebruik de oorspronkelijk geselecteerde speler index
-      // (De rotatie is al berekend om op deze speler uit te komen)
-      const finalPlayerIndex = randomPlayerIndex;
+      // Gebruik EXACT dezelfde logica als de live preview (useEffect) om de winnaar te bepalen
+      // Dit zorgt ervoor dat de winnaar overeenkomt met wat je tijdens het draaien ziet
+      const normalizedRotation = totalRotation % 360;
+      const degreesPerPlayer = 360 / players.length;
+      let finalPlayerIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
+      if (finalPlayerIndex < 0) finalPlayerIndex += players.length;
 
-      console.log("✅ Using player index:", finalPlayerIndex, "Player:", players[finalPlayerIndex].username);
+      console.log("✅ Final rotation:", normalizedRotation, "Winner index:", finalPlayerIndex, "Player:", players[finalPlayerIndex].username);
 
       // Reorder players so selected player is first (bovenste/meest links)
       const reorderedPlayers = [
@@ -1143,31 +1129,80 @@ function Play501GameContent() {
       return Math.random();
     };
 
-    // EERST: Bepaal het resultaat volledig random
-    const result = getRandom() < 0.5 ? "heads" : "tails";
+    // 7 volledige rondjes
+    const sevenRotations = 7 * 360; // 2520 graden
 
-    // Calculate end rotation: add random aantal extra rotaties voor meer variatie
-    // plus de result offset (0deg for heads, 180deg for tails)
-    const baseRotations = 5 + getRandom() * 3; // 5-8 full rotations voor meer variatie
-    const baseDegrees = baseRotations * 360;
-    const resultOffset = result === "heads" ? 0 : 180;
-    // De eindrotatie moet exact op 0 of 180 graden eindigen (niet genormaliseerd)
-    const endRotation = baseDegrees + resultOffset;
+    // Random: 50/50 kans op 0 of 180 graden extra
+    const randomExtra = getRandom() < 0.5 ? 0 : 180;
 
-    // Set the rotation immediately to start the animation
-    setCoinRotation(endRotation);
+    // Startpositie
+    const startRotation = ((coinRotation % 360) + 360) % 360;
 
-    const duration = 3000; // 3 seconds voor langzamere, vloeiendere animatie
+    // Bepaal waar we op uitkomen na 7 rondjes + random extra
+    const roughEndPosition = (startRotation + sevenRotations + randomExtra) % 360;
 
-    // After animation completes, set result and stop flipping
+    // Bepaal exacte eindpositie: 0 of 180 graden
+    // Als roughEndPosition < 180, dan eindigen we op 0 (heads)
+    // Als roughEndPosition >= 180, dan eindigen we op 180 (tails)
+    const endPosition = roughEndPosition < 180 ? 0 : 180;
+
+    // Bereken hoeveel we moeten draaien om exact op endPosition uit te komen
+    // We moeten van startRotation naar endPosition draaien
+    let rotationToEnd = 0;
+    if (endPosition === 0) {
+      // We moeten naar 0 graden eindigen
+      rotationToEnd = startRotation === 0 ? 360 : 360 - startRotation;
+    } else {
+      // We moeten naar 180 graden eindigen
+      if (startRotation < 180) {
+        rotationToEnd = 180 - startRotation;
+      } else if (startRotation > 180) {
+        rotationToEnd = 360 - startRotation + 180;
+      } else {
+        rotationToEnd = 360; // Al op 180, draai een volledige rotatie extra
+      }
+    }
+
+    // Totale rotatie: 7 rondjes + rotatie naar exacte eindpositie
+    // Dit garandeert dat we exact op 0 of 180 graden eindigen
+    const totalRotation = startRotation + sevenRotations + rotationToEnd;
+
+    // Bepaal resultaat: 0 graden = heads (KOP) = speler 0, 180 graden = tails (MUNT) = speler 1
+    const result = endPosition === 0 ? "heads" : "tails";
+
+    console.log("🎯 Coin flip - Start:", startRotation, "7 rotations:", sevenRotations, "Extra:", randomExtra, "Rough end:", roughEndPosition, "Final:", endPosition, "Result:", result);
+
+    // Animatieduur: 3 seconden
+    const duration = 3000;
+    const startTime = Date.now();
+
+    const updateRotation = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out function voor soepele deceleratie
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentRotation = startRotation + (totalRotation - startRotation) * easeOut;
+      setCoinRotation(currentRotation);
+
+      if (progress < 1) {
+        requestAnimationFrame(updateRotation);
+      } else {
+        // Animatie klaar - zet exact op eindpositie (0 of 180 graden)
+        setCoinRotation(endPosition);
+      }
+    };
+
+    setCoinRotation(startRotation);
+    requestAnimationFrame(updateRotation);
+
+    // Na animatie: bepaal resultaat en winnaar
     setTimeout(() => {
-      // Zet de rotatie op de exacte eindwaarde (0 of 180 graden, modulo 360)
-      const finalRotation = result === "heads" ? 0 : 180;
-      setCoinRotation(finalRotation);
+      setCoinRotation(endPosition);
       setCoinResult(result);
       setCoinFlipping(false);
 
-      // Assign based on coin flip
+      // Bepaal welke speler begint op basis van resultaat
+      // Heads (KOP) = speler 0, Tails (MUNT) = speler 1
       let startingPlayerIndex: number;
       if (result === "heads") {
         startingPlayerIndex = 0;
@@ -1181,13 +1216,15 @@ function Play501GameContent() {
         setSetStartingPlayerIndex(1);
       }
 
-      // Only show popup if start popup is still open and popup hasn't been shown yet
+      console.log("🏆 Winner:", players[startingPlayerIndex].username, "will start the game (Result:", result, ")");
+
+      // Toon popup met winnaar voor 2 seconden
       if (showStartPopup && !popupShownRef.current) {
         popupShownRef.current = true; // Mark popup as shown
         setStartingPlayer(players[startingPlayerIndex]);
         setShowStartingPlayerPopup(true);
 
-        // Close popups after showing starting player
+        // Close popups after 2 seconden
         popupTimeoutRef.current = setTimeout(() => {
           setShowStartingPlayerPopup(false);
           setShowStartPopup(false);
@@ -1199,7 +1236,7 @@ function Play501GameContent() {
         setShowStartPopup(false);
       }
     }, duration);
-  }, [coinFlipping, players, showStartPopup]);
+  }, [coinFlipping, players, showStartPopup, coinRotation]);
 
   // Function to request device motion permission (must be called in user gesture context)
   const requestMotionPermission = async () => {
@@ -1733,9 +1770,7 @@ function Play501GameContent() {
                   style={{
                     transformStyle: "preserve-3d",
                     transform: `rotateY(${coinRotation}deg)`,
-                    transition: coinFlipping
-                      ? "transform 3s cubic-bezier(0.4, 0.0, 0.2, 1)"
-                      : "transform 0s",
+                    transition: coinFlipping ? "none" : "transform 0s",
                   }}
                 >
                   {/* Heads side - Player 1 */}
@@ -1846,9 +1881,9 @@ function Play501GameContent() {
               className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
                 }`}
             >
-              <div className="relative z-10 h-full flex flex-col">
-                {/* Naam linksboven */}
-                <div className="font-semibold text-xl mb-3 text-white text-left flex items-center gap-2">
+              <div className="relative z-10 h-full flex flex-col items-center justify-center">
+                {/* Naam bovenaan gecentreerd */}
+                <div className="font-semibold text-xl mb-4 text-white text-center flex items-center justify-center gap-2">
                   {0 === legStartingPlayerIndex && (
                     <div className="w-4 h-4 rounded-full bg-white" />
                   )}
@@ -1868,10 +1903,10 @@ function Play501GameContent() {
                   )}
                   {gameStates[0].player.username}
                 </div>
-                {/* Score en Legs/Sets op dezelfde regel */}
-                <div className="flex items-center justify-between gap-4 flex-1">
-                  {/* Legs en Sets links */}
-                  <div className="text-white text-left">
+                {/* Score en Legs/Sets gecentreerd */}
+                <div className="flex items-center justify-center gap-6 flex-1 w-full">
+                  {/* Legs en Sets */}
+                  <div className="text-white text-center">
                     <div className="text-lg font-bold">
                       L {gameStates[0].legsWon}
                     </div>
@@ -1879,13 +1914,13 @@ function Play501GameContent() {
                       S {gameStates[0].setsWon}
                     </div>
                   </div>
-                  {/* Score rechts */}
+                  {/* Score */}
                   <div className="text-5xl font-bold text-white">
                     {gameStates[0].score}
                   </div>
                 </div>
-                {/* Statistieken links onderin */}
-                <div className="text-xs space-y-1 text-white/80 text-left mt-6">
+                {/* Statistieken onderin gecentreerd */}
+                <div className="text-xs space-y-1 text-white/80 text-center mt-4">
                   <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
                   <div>Darts: {gameStates[0].totalDarts}</div>
                   <div>Laatst: {gameStates[0].lastScore}</div>
@@ -1898,9 +1933,9 @@ function Play501GameContent() {
               className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
                 }`}
             >
-              <div className="relative z-10 h-full flex flex-col">
-                {/* Naam linksboven */}
-                <div className="font-semibold text-xl mb-3 text-[#000000] text-left flex items-center gap-2">
+              <div className="relative z-10 h-full flex flex-col items-center justify-center">
+                {/* Naam bovenaan gecentreerd */}
+                <div className="font-semibold text-xl mb-4 text-[#000000] text-center flex items-center justify-center gap-2">
                   {1 === legStartingPlayerIndex && (
                     <div className="w-4 h-4 rounded-full bg-[#28C7D8]" />
                   )}
@@ -1920,10 +1955,10 @@ function Play501GameContent() {
                   )}
                   {gameStates[1].player.username}
                 </div>
-                {/* Score en Legs/Sets op dezelfde regel */}
-                <div className="flex items-center justify-between gap-4 flex-1">
-                  {/* Legs en Sets links */}
-                  <div className="text-[#000000] text-left">
+                {/* Score en Legs/Sets gecentreerd */}
+                <div className="flex items-center justify-center gap-6 flex-1 w-full">
+                  {/* Legs en Sets */}
+                  <div className="text-[#000000] text-center">
                     <div className="text-lg font-bold">
                       L {gameStates[1].legsWon}
                     </div>
@@ -1931,13 +1966,13 @@ function Play501GameContent() {
                       S {gameStates[1].setsWon}
                     </div>
                   </div>
-                  {/* Score rechts */}
+                  {/* Score */}
                   <div className="text-5xl font-bold text-[#000000]">
                     {gameStates[1].score}
                   </div>
                 </div>
-                {/* Statistieken links onderin */}
-                <div className="text-xs space-y-1 text-[#7E838F] text-left mt-6">
+                {/* Statistieken onderin gecentreerd */}
+                <div className="text-xs space-y-1 text-[#7E838F] text-center mt-4">
                   <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
                   <div>Darts: {gameStates[1].totalDarts}</div>
                   <div>Laatst: {gameStates[1].lastScore}</div>
@@ -2492,7 +2527,7 @@ function Play501GameContent() {
           </div>
         </>
       )}
-    </div >
+    </div>
   );
 }
 
