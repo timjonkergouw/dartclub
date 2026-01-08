@@ -1849,7 +1849,7 @@ function Play501GameContent() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0A294F] pt-4 pb-6 px-4">
       {/* Header met scorebord en logo */}
-      <div className="mb-4 relative">
+      <div className="mb-6 relative">
         <div className="flex justify-between items-start">
           {/* Scorebord linksboven */}
           <div>
@@ -1871,196 +1871,202 @@ function Play501GameContent() {
             </Link>
           </div>
         </div>
+      </div>
 
-
-        {/* Spelers display */}
-        {isTwoPlayers ? (
-          <div className="flex mb-6 rounded-2xl overflow-hidden relative">
-            {/* Speler 1 - Links */}
-            <div
-              className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
-                }`}
-            >
-              <div className="relative z-10 h-full flex flex-col items-center justify-center">
-                {/* Naam bovenaan gecentreerd */}
-                <div className="font-semibold text-xl mb-4 text-white text-center flex items-center justify-center gap-2">
-                  {0 === legStartingPlayerIndex && (
-                    <div className="w-4 h-4 rounded-full bg-white" />
-                  )}
-                  {gameStates[0].player.avatar_url ? (
-                    <Image
-                      src={gameStates[0].player.avatar_url}
-                      alt={gameStates[0].player.username}
-                      width={32}
-                      height={32}
-                      className="rounded-full object-cover"
-                      style={{ width: "32px", height: "32px" }}
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm">
-                      {gameStates[0].player.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  {gameStates[0].player.username}
-                </div>
-                {/* Score en Legs/Sets gecentreerd */}
-                <div className="flex items-center justify-center gap-6 flex-1 w-full">
-                  {/* Legs en Sets */}
-                  <div className="text-white text-center">
-                    <div className="text-lg font-bold">
-                      L {gameStates[0].legsWon}
-                    </div>
+      {/* Spelers display */}
+      {isTwoPlayers ? (
+        <div className="flex mb-6 rounded-2xl overflow-hidden relative">
+          {/* Speler 1 - Links */}
+          <div
+            className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+              }`}
+          >
+            <div className="relative z-10 h-full flex flex-col items-center justify-center">
+              {/* Naam bovenaan gecentreerd */}
+              <div className="font-semibold text-xl mb-4 text-white text-center flex items-center justify-center gap-2">
+                {0 === legStartingPlayerIndex && (
+                  <div className="w-4 h-4 rounded-full bg-white" />
+                )}
+                {gameStates[0].player.avatar_url ? (
+                  <Image
+                    src={gameStates[0].player.avatar_url}
+                    alt={gameStates[0].player.username}
+                    width={32}
+                    height={32}
+                    className="rounded-full object-cover"
+                    style={{ width: "32px", height: "32px" }}
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm">
+                    {gameStates[0].player.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {gameStates[0].player.username}
+              </div>
+              {/* Score en Legs/Sets gecentreerd */}
+              <div className="flex items-center justify-center gap-6 flex-1 w-full">
+                {/* Legs en Sets */}
+                <div className="text-white text-center">
+                  <div className="text-lg font-bold">
+                    L {gameStates[0].legsWon}
+                  </div>
+                  {gameType === "sets" && (
                     <div className="text-lg font-bold">
                       S {gameStates[0].setsWon}
                     </div>
-                  </div>
-                  {/* Score */}
-                  <div className="text-5xl font-bold text-white">
-                    {gameStates[0].score}
-                  </div>
+                  )}
                 </div>
-                {/* Statistieken onderin gecentreerd */}
-                <div className="text-xs space-y-1 text-white/80 text-center mt-4">
-                  <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
-                  <div>Darts: {gameStates[0].totalDarts}</div>
-                  <div>Laatst: {gameStates[0].lastScore}</div>
+                {/* Score */}
+                <div className="text-5xl font-bold text-white">
+                  {gameStates[0].score}
                 </div>
               </div>
+              {/* Statistieken onderin gecentreerd */}
+              <div className="text-xs space-y-1 text-white/80 text-center mt-4">
+                <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
+                <div>Darts: {gameStates[0].totalDarts}</div>
+                <div>Laatst: {gameStates[0].lastScore}</div>
+              </div>
             </div>
+          </div>
 
-            {/* Speler 2 - Rechts */}
-            <div
-              className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
-                }`}
-            >
-              <div className="relative z-10 h-full flex flex-col items-center justify-center">
-                {/* Naam bovenaan gecentreerd */}
-                <div className="font-semibold text-xl mb-4 text-[#000000] text-center flex items-center justify-center gap-2">
-                  {1 === legStartingPlayerIndex && (
-                    <div className="w-4 h-4 rounded-full bg-[#28C7D8]" />
-                  )}
-                  {gameStates[1].player.avatar_url ? (
-                    <Image
-                      src={gameStates[1].player.avatar_url}
-                      alt={gameStates[1].player.username}
-                      width={32}
-                      height={32}
-                      className="rounded-full object-cover"
-                      style={{ width: "32px", height: "32px" }}
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#0A294F]/20 flex items-center justify-center text-[#0A294F] font-semibold text-sm">
-                      {gameStates[1].player.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  {gameStates[1].player.username}
-                </div>
-                {/* Score en Legs/Sets gecentreerd */}
-                <div className="flex items-center justify-center gap-6 flex-1 w-full">
-                  {/* Legs en Sets */}
-                  <div className="text-[#000000] text-center">
-                    <div className="text-lg font-bold">
-                      L {gameStates[1].legsWon}
-                    </div>
+          {/* Speler 2 - Rechts */}
+          <div
+            className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+              }`}
+          >
+            <div className="relative z-10 h-full flex flex-col items-center justify-center">
+              {/* Naam bovenaan gecentreerd */}
+              <div className="font-semibold text-xl mb-4 text-[#000000] text-center flex items-center justify-center gap-2">
+                {1 === legStartingPlayerIndex && (
+                  <div className="w-4 h-4 rounded-full bg-[#28C7D8]" />
+                )}
+                {gameStates[1].player.avatar_url ? (
+                  <Image
+                    src={gameStates[1].player.avatar_url}
+                    alt={gameStates[1].player.username}
+                    width={32}
+                    height={32}
+                    className="rounded-full object-cover"
+                    style={{ width: "32px", height: "32px" }}
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#0A294F]/20 flex items-center justify-center text-[#0A294F] font-semibold text-sm">
+                    {gameStates[1].player.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {gameStates[1].player.username}
+              </div>
+              {/* Score en Legs/Sets gecentreerd */}
+              <div className="flex items-center justify-center gap-6 flex-1 w-full">
+                {/* Legs en Sets */}
+                <div className="text-[#000000] text-center">
+                  <div className="text-lg font-bold">
+                    L {gameStates[1].legsWon}
+                  </div>
+                  {gameType === "sets" && (
                     <div className="text-lg font-bold">
                       S {gameStates[1].setsWon}
                     </div>
-                  </div>
-                  {/* Score */}
-                  <div className="text-5xl font-bold text-[#000000]">
-                    {gameStates[1].score}
-                  </div>
+                  )}
                 </div>
-                {/* Statistieken onderin gecentreerd */}
-                <div className="text-xs space-y-1 text-[#7E838F] text-center mt-4">
-                  <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
-                  <div>Darts: {gameStates[1].totalDarts}</div>
-                  <div>Laatst: {gameStates[1].lastScore}</div>
+                {/* Score */}
+                <div className="text-5xl font-bold text-[#000000]">
+                  {gameStates[1].score}
                 </div>
+              </div>
+              {/* Statistieken onderin gecentreerd */}
+              <div className="text-xs space-y-1 text-[#7E838F] text-center mt-4">
+                <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
+                <div>Darts: {gameStates[1].totalDarts}</div>
+                <div>Laatst: {gameStates[1].lastScore}</div>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="mb-6 space-y-2">
-            {gameStates.map((state, index) => (
-              <div
-                key={state.player.id}
-                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${index === currentPlayerIndex
-                  ? index % 2 === 0
-                    ? "bg-[#28C7D8] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-105"
-                    : "bg-[#EEEEEE] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-105"
-                  : index % 2 === 0
-                    ? "bg-[#28C7D8]"
-                    : "bg-[#EEEEEE]"
-                  }`}
-              >
-                <div className="flex items-center gap-3 flex-1">
-                  {index === legStartingPlayerIndex && (
-                    <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
-                      }`} />
-                  )}
-                  {state.player.avatar_url ? (
-                    <Image
-                      src={state.player.avatar_url}
-                      alt={state.player.username}
-                      width={28}
-                      height={28}
-                      className={`rounded-full object-cover ${players.length > 3 ? "hidden sm:block" : ""}`}
-                      style={{ width: "28px", height: "28px" }}
-                    />
-                  ) : (
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs ${index % 2 === 0 ? "bg-white/20 text-white" : "bg-[#0A294F]/20 text-[#0A294F]"
-                        } ${players.length > 3 ? "hidden sm:flex" : ""}`}
-                    >
-                      {state.player.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+        </div>
+      ) : (
+        <div className="mb-6 space-y-2">
+          {gameStates.map((state, index) => (
+            <div
+              key={state.player.id}
+              className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${index === currentPlayerIndex
+                ? index % 2 === 0
+                  ? "bg-[#28C7D8] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-[1.02] sm:scale-100"
+                  : "bg-[#EEEEEE] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-[1.02] sm:scale-100"
+                : index % 2 === 0
+                  ? "bg-[#28C7D8]"
+                  : "bg-[#EEEEEE]"
+                }`}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                {index === legStartingPlayerIndex && (
+                  <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
+                    }`} />
+                )}
+                {state.player.avatar_url ? (
+                  <Image
+                    src={state.player.avatar_url}
+                    alt={state.player.username}
+                    width={28}
+                    height={28}
+                    className={`rounded-full object-cover ${players.length > 3 ? "hidden sm:block" : ""}`}
+                    style={{ width: "28px", height: "28px" }}
+                  />
+                ) : (
                   <div
-                    className={`font-semibold text-base ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                      }`}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs ${index % 2 === 0 ? "bg-white/20 text-white" : "bg-[#0A294F]/20 text-[#0A294F]"
+                      } ${players.length > 3 ? "hidden sm:flex" : ""}`}
                   >
-                    {state.player.username}
+                    {state.player.username.charAt(0).toUpperCase()}
                   </div>
-                  <div
-                    className={`text-xs ${index % 2 === 0 ? "text-white/80" : "text-[#7E838F]"
-                      }`}
-                  >
-                    3-dart avg: {calculateAverage(state)}
-                  </div>
+                )}
+                <div
+                  className={`font-semibold text-base ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                    }`}
+                >
+                  {state.player.username}
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                    }`}>
-                    {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
+                <div
+                  className={`text-xs ${index % 2 === 0 ? "text-white/80" : "text-[#7E838F]"
+                    }`}
+                >
+                  3-dart avg: {calculateAverage(state)}
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                  }`}>
+                  {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
+                  {gameType === "sets" && (
                     <div className={players.length > 3 ? "block sm:hidden text-base" : "hidden"}>
                       L {state.legsWon} · S {state.setsWon}
                     </div>
-                    <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
-                      L {state.legsWon}
-                    </div>
+                  )}
+                  <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
+                    L {state.legsWon}
+                  </div>
+                  {gameType === "sets" && (
                     <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
                       S {state.setsWon}
                     </div>
-                  </div>
-                  <div
-                    className={`text-2xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                      }`}
-                  >
-                    {state.score}
-                  </div>
+                  )}
+                </div>
+                <div
+                  className={`text-2xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                    }`}
+                >
+                  {state.score}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Wie is aan de beurt - onder het scorebord */}
-        <div className="text-white text-xl font-semibold mt-2 text-left">
-          {gameStates[currentPlayerIndex].player.username} is aan de beurt!
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
+      {/* Wie is aan de beurt - onder het scorebord */}
+      <div className="text-white text-xl font-semibold mt-2 text-left">
+        {gameStates[currentPlayerIndex].player.username} is aan de beurt!
+      </div>
 
       {/* Huidige invoer balkje */}
       <div className="mb-6 w-full">
@@ -2210,324 +2216,332 @@ function Play501GameContent() {
       </div>
 
       {/* Double Checkout Popup */}
-      {showDoublePopup && pendingDoubleCheckout && (
-        <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
-            onClick={() => {
-              // Prevent closing without selection
-            }}
-          />
-
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {
+        showDoublePopup && pendingDoubleCheckout && (
+          <>
+            {/* Overlay */}
             <div
-              className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <h2 className="text-[#000000] font-semibold text-xl mb-2">
-                  {pendingDoubleCheckout.isCheckout ? "Uitgegooid!" : "Mogelijke finish"}
-                </h2>
-                {pendingDoubleCheckout.isCheckout ? (
-                  <p className="text-[#7E838F] text-sm">
-                    Hoeveel pijlen heb je op een dubbel gegooid?
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-[#7E838F] text-sm mb-2">
-                      Je staat op {pendingDoubleCheckout.currentState.score - pendingDoubleCheckout.score}
-                    </p>
+              className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
+              onClick={() => {
+                // Prevent closing without selection
+              }}
+            />
+
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-6">
+                  <h2 className="text-[#000000] font-semibold text-xl mb-2">
+                    {pendingDoubleCheckout.isCheckout ? "Uitgegooid!" : "Mogelijke finish"}
+                  </h2>
+                  {pendingDoubleCheckout.isCheckout ? (
                     <p className="text-[#7E838F] text-sm">
                       Hoeveel pijlen heb je op een dubbel gegooid?
                     </p>
-                  </>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      <p className="text-[#7E838F] text-sm mb-2">
+                        Je staat op {pendingDoubleCheckout.currentState.score - pendingDoubleCheckout.score}
+                      </p>
+                      <p className="text-[#7E838F] text-sm">
+                        Hoeveel pijlen heb je op een dubbel gegooid?
+                      </p>
+                    </>
+                  )}
+                </div>
 
-              <div className="flex gap-3 mb-6 justify-center">
-                {pendingDoubleCheckout.possibleDartsOnDouble
-                  .sort((a, b) => a - b)
-                  .map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => setDoubleDarts(num)}
-                      className={`w-20 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${doubleDarts === num
-                        ? "bg-[#0A294F] text-[#E8F0FF]"
-                        : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
-                        }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-              </div>
+                <div className="flex gap-3 mb-6 justify-center">
+                  {pendingDoubleCheckout.possibleDartsOnDouble
+                    .sort((a, b) => a - b)
+                    .map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => setDoubleDarts(num)}
+                        className={`w-20 py-4 px-4 rounded-xl font-semibold text-lg transition-all duration-150 ${doubleDarts === num
+                          ? "bg-[#0A294F] text-[#E8F0FF]"
+                          : "bg-white text-[#000000] border-2 border-[#0A294F] hover:bg-[#D0E0FF]"
+                          }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                </div>
 
-              <button
-                onClick={confirmDoubleCheckout}
-                disabled={doubleDarts === null}
-                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Bevestigen
-              </button>
+                <button
+                  onClick={confirmDoubleCheckout}
+                  disabled={doubleDarts === null}
+                  className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Bevestigen
+                </button>
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )
+      }
 
       {/* Game Finished Screen */}
-      {showGameFinished && winner && (
-        <>
-          {/* Overlay */}
-          <div className="fixed inset-0 bg-[#0A294F] bg-opacity-90 backdrop-blur-sm z-50 transition-opacity duration-300" />
+      {
+        showGameFinished && winner && (
+          <>
+            {/* Overlay */}
+            <div className="fixed inset-0 bg-[#0A294F] bg-opacity-90 backdrop-blur-sm z-50 transition-opacity duration-300" />
 
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="min-h-full flex items-start justify-center p-4 py-8">
-              <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-4xl">
-                {/* Winnaar header */}
-                <div className="text-center mb-6">
-                  <h1 className="text-3xl font-bold text-[#000000] mb-2">
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      {winner.player.avatar_url ? (
-                        <Image
-                          src={winner.player.avatar_url}
-                          alt={winner.player.username}
-                          width={48}
-                          height={48}
-                          className="rounded-full object-cover"
-                          style={{ width: "48px", height: "48px" }}
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xl">
-                          {winner.player.username.charAt(0).toUpperCase()}
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="min-h-full flex items-start justify-center p-4 py-8">
+                <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-4xl">
+                  {/* Winnaar header */}
+                  <div className="text-center mb-6">
+                    <h1 className="text-3xl font-bold text-[#000000] mb-2">
+                      <div className="flex items-center justify-center gap-3 mb-2">
+                        {winner.player.avatar_url ? (
+                          <Image
+                            src={winner.player.avatar_url}
+                            alt={winner.player.username}
+                            width={48}
+                            height={48}
+                            className="rounded-full object-cover"
+                            style={{ width: "48px", height: "48px" }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xl">
+                            {winner.player.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span>{winner.player.username}</span>
+                      </div>
+                      <span className="block">heeft gewonnen!</span>
+                    </h1>
+                    <p className="text-[#7E838F] text-sm">
+                      {gameMode === "first-to" ? "First to" : "Best of"} {target} {gameType}
+                    </p>
+                  </div>
+
+                  {/* Stand bovenaan */}
+                  <div className="mb-6 bg-[#0A294F] rounded-xl p-4">
+                    <div className="text-center text-white font-bold text-lg mb-3">Stand</div>
+                    <div className="flex justify-center items-center gap-4">
+                      {gameStates.length >= 2 && (
+                        <>
+                          <div className="flex items-center gap-2 text-white font-semibold text-base">
+                            {gameStates[0].player.avatar_url ? (
+                              <Image
+                                src={gameStates[0].player.avatar_url}
+                                alt={gameStates[0].player.username}
+                                width={24}
+                                height={24}
+                                className="rounded-full object-cover"
+                                style={{ width: "24px", height: "24px" }}
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
+                                {gameStates[0].player.username.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            {gameStates[0].player.username}
+                          </div>
+                          <div className="text-[#28C7D8] font-bold text-3xl">
+                            {gameType === "sets" ? gameStates[0].setsWon : gameStates[0].legsWon} - {gameType === "sets" ? gameStates[1].setsWon : gameStates[1].legsWon}
+                          </div>
+                          <div className="flex items-center gap-2 text-white font-semibold text-base">
+                            {gameStates[1].player.avatar_url ? (
+                              <Image
+                                src={gameStates[1].player.avatar_url}
+                                alt={gameStates[1].player.username}
+                                width={24}
+                                height={24}
+                                className="rounded-full object-cover"
+                                style={{ width: "24px", height: "24px" }}
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
+                                {gameStates[1].player.username.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            {gameStates[1].player.username}
+                          </div>
+                        </>
+                      )}
+                      {gameStates.length === 1 && (
+                        <div className="text-center">
+                          <div className="text-white font-semibold text-base">{gameStates[0].player.username}</div>
+                          <div className="text-[#28C7D8] font-bold text-3xl">
+                            {gameType === "sets" ? gameStates[0].setsWon : gameStates[0].legsWon}
+                          </div>
                         </div>
                       )}
-                      <span>{winner.player.username}</span>
                     </div>
-                    <span className="block">heeft gewonnen!</span>
-                  </h1>
+                  </div>
+
+                  {/* Statistieken tabel */}
+                  <div className="mb-6 overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-[#0A294F] text-white">
+                          <th className="p-3 text-left font-semibold border border-[#0A294F]">
+                            {gameStates[0]?.player.username || "Speler 1"}
+                          </th>
+                          <th className="p-3 text-center font-semibold border border-[#0A294F]">Statistiek</th>
+                          <th className="p-3 text-right font-semibold border border-[#0A294F]">
+                            {gameStates[1]?.player.username || "Speler 2"}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const player1Stat = playerStats.get(gameStates[0]?.player.id) || createInitialStats();
+                          const player2Stat = gameStates[1] ? (playerStats.get(gameStates[1]?.player.id) || createInitialStats()) : createInitialStats();
+
+                          const player1Avg = player1Stat.totalTurns > 0 ? Math.round((player1Stat.totalScore / player1Stat.totalTurns) * 100) / 100 : 0;
+                          const player2Avg = player2Stat.totalTurns > 0 ? Math.round((player2Stat.totalScore / player2Stat.totalTurns) * 100) / 100 : 0;
+
+                          const player1First9Avg = player1Stat.first9Turns > 0 ? Math.round((player1Stat.first9Score / player1Stat.first9Turns) * 100) / 100 : 0;
+                          const player2First9Avg = player2Stat.first9Turns > 0 ? Math.round((player2Stat.first9Score / player2Stat.first9Turns) * 100) / 100 : 0;
+
+                          const player1BestLeg = player1Stat.legDarts.length > 0 ? Math.min(...player1Stat.legDarts) : 0;
+                          const player2BestLeg = player2Stat.legDarts.length > 0 ? Math.min(...player2Stat.legDarts) : 0;
+
+                          const player1WorstLeg = player1Stat.legDarts.length > 0 ? Math.max(...player1Stat.legDarts) : 0;
+                          const player2WorstLeg = player2Stat.legDarts.length > 0 ? Math.max(...player2Stat.legDarts) : 0;
+
+                          const stats = [
+                            { label: "3-dart gemiddeld", player1: player1Avg.toFixed(2), player2: player2Avg.toFixed(2) },
+                            { label: "First 9 gemiddeld", player1: player1First9Avg.toFixed(2), player2: player2First9Avg.toFixed(2) },
+                            { label: "Hoogste finish", player1: player1Stat.highestFinish.toString(), player2: player2Stat.highestFinish.toString() },
+                            { label: "Hoogste score", player1: player1Stat.highestScore.toString(), player2: player2Stat.highestScore.toString() },
+                            { label: "Beste leg", player1: player1BestLeg > 0 ? player1BestLeg.toString() : "-", player2: player2BestLeg > 0 ? player2BestLeg.toString() : "-" },
+                            { label: "Slechtste leg", player1: player1WorstLeg > 0 ? player1WorstLeg.toString() : "-", player2: player2WorstLeg > 0 ? player2WorstLeg.toString() : "-" },
+                            { label: "180's", player1: player1Stat.oneEighties.toString(), player2: player2Stat.oneEighties.toString() },
+                            { label: "140+ scores", player1: player1Stat.scores140Plus.toString(), player2: player2Stat.scores140Plus.toString() },
+                            { label: "100+ scores", player1: player1Stat.scores100Plus.toString(), player2: player2Stat.scores100Plus.toString() },
+                            { label: "80+ scores", player1: player1Stat.scores80Plus.toString(), player2: player2Stat.scores80Plus.toString() },
+                          ];
+
+                          return stats.map((stat, index) => (
+                            <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#E8F0FF]"}>
+                              <td className="p-3 text-left font-semibold text-[#000000] border border-[#D0E0FF]">
+                                {stat.player1}
+                              </td>
+                              <td className="p-3 text-center text-[#7E838F] border border-[#D0E0FF]">
+                                {stat.label}
+                              </td>
+                              <td className="p-3 text-right font-semibold text-[#000000] border border-[#D0E0FF]">
+                                {stat.player2}
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleMenu}
+                      className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold text-sm hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150 border-2 border-[#0A294F]"
+                    >
+                      Terug naar menu
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowGameFinished(false);
+                        router.push("/speel-501");
+                      }}
+                      className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold text-sm hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
+                    >
+                      Nieuw spel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      }
+
+      {/* Bust Popup */}
+      {
+        showBustPopup && (
+          <>
+            {/* Overlay */}
+            <div
+              className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
+              onClick={() => {
+                // Prevent closing without confirmation
+              }}
+            />
+
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-6">
+                  <h2 className="text-[#000000] font-semibold text-xl mb-2">
+                    Bust!
+                  </h2>
                   <p className="text-[#7E838F] text-sm">
-                    {gameMode === "first-to" ? "First to" : "Best of"} {target} {gameType}
+                    Deze score is niet mogelijk. De beurt gaat naar de volgende speler.
                   </p>
                 </div>
 
-                {/* Stand bovenaan */}
-                <div className="mb-6 bg-[#0A294F] rounded-xl p-4">
-                  <div className="text-center text-white font-bold text-lg mb-3">Stand</div>
-                  <div className="flex justify-center items-center gap-4">
-                    {gameStates.length >= 2 && (
-                      <>
-                        <div className="flex items-center gap-2 text-white font-semibold text-base">
-                          {gameStates[0].player.avatar_url ? (
-                            <Image
-                              src={gameStates[0].player.avatar_url}
-                              alt={gameStates[0].player.username}
-                              width={24}
-                              height={24}
-                              className="rounded-full object-cover"
-                              style={{ width: "24px", height: "24px" }}
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
-                              {gameStates[0].player.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          {gameStates[0].player.username}
-                        </div>
-                        <div className="text-[#28C7D8] font-bold text-3xl">
-                          {gameType === "sets" ? gameStates[0].setsWon : gameStates[0].legsWon} - {gameType === "sets" ? gameStates[1].setsWon : gameStates[1].legsWon}
-                        </div>
-                        <div className="flex items-center gap-2 text-white font-semibold text-base">
-                          {gameStates[1].player.avatar_url ? (
-                            <Image
-                              src={gameStates[1].player.avatar_url}
-                              alt={gameStates[1].player.username}
-                              width={24}
-                              height={24}
-                              className="rounded-full object-cover"
-                              style={{ width: "24px", height: "24px" }}
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-xs">
-                              {gameStates[1].player.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          {gameStates[1].player.username}
-                        </div>
-                      </>
-                    )}
-                    {gameStates.length === 1 && (
-                      <div className="text-center">
-                        <div className="text-white font-semibold text-base">{gameStates[0].player.username}</div>
-                        <div className="text-[#28C7D8] font-bold text-3xl">
-                          {gameType === "sets" ? gameStates[0].setsWon : gameStates[0].legsWon}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Statistieken tabel */}
-                <div className="mb-6 overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-[#0A294F] text-white">
-                        <th className="p-3 text-left font-semibold border border-[#0A294F]">
-                          {gameStates[0]?.player.username || "Speler 1"}
-                        </th>
-                        <th className="p-3 text-center font-semibold border border-[#0A294F]">Statistiek</th>
-                        <th className="p-3 text-right font-semibold border border-[#0A294F]">
-                          {gameStates[1]?.player.username || "Speler 2"}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const player1Stat = playerStats.get(gameStates[0]?.player.id) || createInitialStats();
-                        const player2Stat = gameStates[1] ? (playerStats.get(gameStates[1]?.player.id) || createInitialStats()) : createInitialStats();
-
-                        const player1Avg = player1Stat.totalTurns > 0 ? Math.round((player1Stat.totalScore / player1Stat.totalTurns) * 100) / 100 : 0;
-                        const player2Avg = player2Stat.totalTurns > 0 ? Math.round((player2Stat.totalScore / player2Stat.totalTurns) * 100) / 100 : 0;
-
-                        const player1First9Avg = player1Stat.first9Turns > 0 ? Math.round((player1Stat.first9Score / player1Stat.first9Turns) * 100) / 100 : 0;
-                        const player2First9Avg = player2Stat.first9Turns > 0 ? Math.round((player2Stat.first9Score / player2Stat.first9Turns) * 100) / 100 : 0;
-
-                        const player1BestLeg = player1Stat.legDarts.length > 0 ? Math.min(...player1Stat.legDarts) : 0;
-                        const player2BestLeg = player2Stat.legDarts.length > 0 ? Math.min(...player2Stat.legDarts) : 0;
-
-                        const player1WorstLeg = player1Stat.legDarts.length > 0 ? Math.max(...player1Stat.legDarts) : 0;
-                        const player2WorstLeg = player2Stat.legDarts.length > 0 ? Math.max(...player2Stat.legDarts) : 0;
-
-                        const stats = [
-                          { label: "3-dart gemiddeld", player1: player1Avg.toFixed(2), player2: player2Avg.toFixed(2) },
-                          { label: "First 9 gemiddeld", player1: player1First9Avg.toFixed(2), player2: player2First9Avg.toFixed(2) },
-                          { label: "Hoogste finish", player1: player1Stat.highestFinish.toString(), player2: player2Stat.highestFinish.toString() },
-                          { label: "Hoogste score", player1: player1Stat.highestScore.toString(), player2: player2Stat.highestScore.toString() },
-                          { label: "Beste leg", player1: player1BestLeg > 0 ? player1BestLeg.toString() : "-", player2: player2BestLeg > 0 ? player2BestLeg.toString() : "-" },
-                          { label: "Slechtste leg", player1: player1WorstLeg > 0 ? player1WorstLeg.toString() : "-", player2: player2WorstLeg > 0 ? player2WorstLeg.toString() : "-" },
-                          { label: "180's", player1: player1Stat.oneEighties.toString(), player2: player2Stat.oneEighties.toString() },
-                          { label: "140+ scores", player1: player1Stat.scores140Plus.toString(), player2: player2Stat.scores140Plus.toString() },
-                          { label: "100+ scores", player1: player1Stat.scores100Plus.toString(), player2: player2Stat.scores100Plus.toString() },
-                          { label: "80+ scores", player1: player1Stat.scores80Plus.toString(), player2: player2Stat.scores80Plus.toString() },
-                        ];
-
-                        return stats.map((stat, index) => (
-                          <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-[#E8F0FF]"}>
-                            <td className="p-3 text-left font-semibold text-[#000000] border border-[#D0E0FF]">
-                              {stat.player1}
-                            </td>
-                            <td className="p-3 text-center text-[#7E838F] border border-[#D0E0FF]">
-                              {stat.label}
-                            </td>
-                            <td className="p-3 text-right font-semibold text-[#000000] border border-[#D0E0FF]">
-                              {stat.player2}
-                            </td>
-                          </tr>
-                        ));
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleMenu}
-                    className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold text-sm hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150 border-2 border-[#0A294F]"
-                  >
-                    Terug naar menu
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowGameFinished(false);
-                      router.push("/speel-501");
-                    }}
-                    className="flex-1 py-3 px-4 bg-[#28C7D8] text-white rounded-xl font-semibold text-sm hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"
-                  >
-                    Nieuw spel
-                  </button>
-                </div>
+                <button
+                  onClick={confirmBust}
+                  className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
+                >
+                  Bevestigen
+                </button>
               </div>
             </div>
-          </div>
-        </>
-      )}
-
-      {/* Bust Popup */}
-      {showBustPopup && (
-        <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
-            onClick={() => {
-              // Prevent closing without confirmation
-            }}
-          />
-
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <h2 className="text-[#000000] font-semibold text-xl mb-2">
-                  Bust!
-                </h2>
-                <p className="text-[#7E838F] text-sm">
-                  Deze score is niet mogelijk. De beurt gaat naar de volgende speler.
-                </p>
-              </div>
-
-              <button
-                onClick={confirmBust}
-                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
-              >
-                Bevestigen
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )
+      }
 
       {/* Invalid Score Popup */}
-      {showInvalidScorePopup && (
-        <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
-            onClick={() => {
-              // Prevent closing without confirmation
-            }}
-          />
-
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {
+        showInvalidScorePopup && (
+          <>
+            {/* Overlay */}
             <div
-              className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <h2 className="text-[#000000] font-semibold text-xl mb-2">
-                  Ongeldige score
-                </h2>
-                <p className="text-[#7E838F] text-sm">
-                  De maximale score met 3 pijlen is 180. Voer een geldige score in.
-                </p>
-              </div>
+              className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
+              onClick={() => {
+                // Prevent closing without confirmation
+              }}
+            />
 
-              <button
-                onClick={() => setShowInvalidScorePopup(false)}
-                className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md"
+                onClick={(e) => e.stopPropagation()}
               >
-                Sluiten
-              </button>
+                <div className="text-center mb-6">
+                  <h2 className="text-[#000000] font-semibold text-xl mb-2">
+                    Ongeldige score
+                  </h2>
+                  <p className="text-[#7E838F] text-sm">
+                    De maximale score met 3 pijlen is 180. Voer een geldige score in.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowInvalidScorePopup(false)}
+                  className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
+                >
+                  Sluiten
+                </button>
+              </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )
+      }
+    </div >
   );
 }
 
