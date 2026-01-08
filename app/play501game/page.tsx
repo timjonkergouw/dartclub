@@ -777,13 +777,11 @@ function Play501GameContent() {
     }
 
     if (finishGameRef.current) {
-      console.log("finishGame already called for game:", finishGameRef.current, "- skipping...");
       return;
     }
 
     // Zet lock DIRECT om race conditions te voorkomen
     finishGameLockRef.current = true;
-    console.log("🔒 finishGame lock acquired");
 
     try {
       // Maak eerst een game record aan in de games tabel
@@ -809,7 +807,6 @@ function Play501GameContent() {
       }
 
       const gameUuid = gameData.id;
-      console.log("🎮 Created game record:", gameUuid);
 
       // Sla game UUID op om dubbele aanroep te voorkomen
       finishGameRef.current = gameUuid;
@@ -833,13 +830,6 @@ function Play501GameContent() {
           : state.totalDarts;
 
         const finalStatsData = calculateFinalStats(playerStat, state.lastScore, totalDarts);
-
-        console.log(`📊 Saving stats for player ${state.player.id} (${state.player.username}):`, {
-          finish: finalStatsData.finish,
-          game_id: gameUuid,
-          lastScore: state.lastScore,
-          legsWon: state.legsWon
-        });
 
         // Filter null/undefined/NaN waarden en maak insertData object
         const insertData: Record<string, string | number | boolean | null | number[]> = {
@@ -869,7 +859,6 @@ function Play501GameContent() {
 
         // Als er al een record bestaat, skip insert
         if (existingData) {
-          console.log(`⚠️ Stats already exist for player ${state.player.id} in game ${gameUuid}, skipping insert`);
           return;
         }
 
@@ -883,12 +872,10 @@ function Play501GameContent() {
           console.error(`   Hint:`, error.hint);
           console.error(`   Insert Data:`, JSON.stringify(insertData, null, 2));
         } else {
-          console.log(`✅ Successfully saved stats for player ${state.player.id}:`, data);
         }
       });
 
       await Promise.all(statsPromises);
-      console.log("✅ All stats saved for game:", gameUuid);
     } catch (error) {
       console.error("Error saving game stats:", error);
       // Reset lock bij error
@@ -913,7 +900,6 @@ function Play501GameContent() {
 
     if (showGameFinished && winner && gameStates.length > 0 && !finishGameRef.current && !finishGameLockRef.current && !finishGameTriggeredRef.current) {
       finishGameTriggeredRef.current = true; // Zet DIRECT om race conditions te voorkomen
-      console.log("🚀 Triggering finishGame from useEffect");
       const finalStats = new Map<number, DartStats>();
       playerStats.forEach((stats, playerId) => {
         finalStats.set(playerId, stats);
@@ -1071,7 +1057,6 @@ function Play501GameContent() {
       let finalPlayerIndex = Math.floor((360 - normalizedRotation) / degreesPerPlayer) % players.length;
       if (finalPlayerIndex < 0) finalPlayerIndex += players.length;
 
-      console.log("✅ Final rotation:", normalizedRotation, "Winner index:", finalPlayerIndex, "Player:", players[finalPlayerIndex].username);
 
       // Reorder players so selected player is first (bovenste/meest links)
       const reorderedPlayers = [
@@ -1087,7 +1072,6 @@ function Play501GameContent() {
       ];
       setGameStates(reorderedStates);
 
-      console.log("🏆 Winner:", reorderedPlayers[0].username, "will start the game");
 
       // Set the starting player (now at index 0 after reordering) - dit is de winnaar
       setCurrentPlayerIndex(0);
@@ -1170,7 +1154,6 @@ function Play501GameContent() {
     // Bepaal resultaat: 0 graden = heads (KOP) = speler 0, 180 graden = tails (MUNT) = speler 1
     const result = endPosition === 0 ? "heads" : "tails";
 
-    console.log("🎯 Coin flip - Start:", startRotation, "7 rotations:", sevenRotations, "Extra:", randomExtra, "Rough end:", roughEndPosition, "Final:", endPosition, "Result:", result);
 
     // Animatieduur: 3 seconden
     const duration = 3000;
@@ -1216,7 +1199,6 @@ function Play501GameContent() {
         setSetStartingPlayerIndex(1);
       }
 
-      console.log("🏆 Winner:", players[startingPlayerIndex].username, "will start the game (Result:", result, ")");
 
       // Toon popup met winnaar voor 2 seconden
       if (showStartPopup && !popupShownRef.current) {
@@ -1585,9 +1567,7 @@ function Play501GameContent() {
                 <button
                   onClick={async (e) => {
                     e.preventDefault();
-                    console.log("Coin button clicked - requesting permission...");
-                    const granted = await requestMotionPermission();
-                    console.log("Permission result for coin:", granted);
+                    await requestMotionPermission();
                     setStartMethod("coin");
                   }}
                   className="w-full py-4 px-6 bg-[#28C7D8] text-white rounded-xl font-semibold text-lg hover:bg-[#22a8b7] active:scale-95 transition-all duration-150"

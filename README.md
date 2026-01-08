@@ -4,7 +4,7 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
 
 ## 📱 Beschrijving
 
-DartClub is een responsive web applicatie speciaal ontworpen voor smartphones. De app biedt verschillende functionaliteiten voor dartspelers, waaronder het spelen van 501 (normaal en borrelmodus), het bekijken van statistieken, achievements en professionele uitslagen.
+DartClub is een responsive web applicatie speciaal ontworpen voor smartphones. De app biedt verschillende functionaliteiten voor dartspelers, waaronder het spelen van 501 (normaal en borrelmodus), het beheren van spelersprofielen, het bekijken van statistieken, en professionele uitslagen.
 
 ## 🚀 Voor Beginners: Wat is dit?
 
@@ -28,7 +28,7 @@ Als je nog niet veel ervaring hebt met web development, hier is een korte uitleg
 - **Supabase** - Backend-as-a-Service voor database, authenticatie en real-time features
   - PostgreSQL database voor data opslag
   - Row Level Security (RLS) voor data beveiliging
-  - Real-time subscriptions (momenteel niet actief gebruikt)
+  - Storage voor profielfoto's
 
 ### Design System
 - **Gilroy Font** - Modern lettertype geladen via CDN
@@ -41,11 +41,56 @@ Als je nog niet veel ervaring hebt met web development, hier is een korte uitleg
 
 ## 📋 Functies
 
-- 🎯 **Speel 501** - Normaal 501 spelen met volledige score tracking
-- 🍺 **Speel 501 Borrelmodus** - Met vrienden en drankregels (nog te implementeren)
-- 📊 **Statistieken** - Bekijk je dart statistieken (nog te implementeren)
-- 🏆 **Achievements** - Bekijk je Achievements en Badges (nog te implementeren)
-- 📺 **Uitslagen Profs** - Bekijk de uitslagen van de profs (nog te implementeren)
+### ✅ Geïmplementeerd
+
+- 🎯 **Speel 501** - Volledig 501 spel met score tracking
+  - 2-speler en multi-player modus
+  - First to / Best of modus
+  - Sets en Legs ondersteuning
+  - Bust detection (score onder 0 of op 1)
+  - Checkout suggesties
+  - Dubbelpercentage tracking (optioneel)
+  - Spel geschiedenis (undo functionaliteit)
+  
+- 👥 **Spelersbeheer** - Volledig profielbeheer systeem
+  - Spelersprofielen aanmaken, bewerken en verwijderen
+  - Profielfoto's uploaden en beheren
+  - Avatar ondersteuning met fallback initialen
+  - Supabase Storage integratie
+  
+- 🎲 **Startmethoden** - Verschillende manieren om te bepalen wie begint
+  - Bullseye selectie
+  - Radje draaien (wheel spin) met animatie
+  - Munt opgooien (coin flip) met animatie
+  - Device motion (schudden) ondersteuning
+  
+- 📊 **Statistieken** - Uitgebreide statistieken tracking
+  - 3-dart gemiddelde
+  - First 9 gemiddelde
+  - Hoogste finishes (top 5)
+  - Beste leg (minste aantal darts)
+  - Totaal aantal 180's
+  - Totaal aantal 140+, 100+, 80+ scores
+  - Totaal aantal finishes boven de 100
+  - Automatische opslag na elk spel
+  
+- 🎨 **UI/UX Features**
+  - Responsive design (mobile-first)
+  - Custom modals en popups
+  - Smooth animaties
+  - Huidige speler highlight
+  - Starting player indicator
+  - Game finished popup met statistieken
+
+### 🚧 Toekomstige Features
+
+- [ ] Authenticatie systeem (Supabase Auth)
+- [ ] Achievements systeem
+- [ ] Multiplayer real-time games
+- [ ] Spel geschiedenis bekijken
+- [ ] Export statistieken
+- [ ] Dark mode toggle
+- [ ] Borrelmodus met drankregels
 
 ## 🗄️ Supabase Database Setup
 
@@ -55,17 +100,18 @@ Supabase is een open-source alternatief voor Firebase. Het biedt:
 - **PostgreSQL Database**: Een krachtige relationele database
 - **Real-time**: Automatische updates wanneer data verandert
 - **Authentication**: Gebruikersbeheer (momenteel niet gebruikt)
-- **Storage**: Bestandsopslag (momenteel niet gebruikt)
+- **Storage**: Bestandsopslag voor profielfoto's
 
 ### Database Schema
 
-De app gebruikt momenteel twee tabellen:
+De app gebruikt momenteel drie tabellen:
 
 #### `profiles` tabel
 Slaat speler profielen op:
 ```sql
 - id: integer (primary key, auto-increment)
 - username: text (uniek, verplicht)
+- avatar_url: text (optioneel, URL naar Supabase Storage)
 - created_at: timestamp (automatisch)
 ```
 
@@ -97,6 +143,13 @@ Slaat spelstatistieken op:
 - created_at: timestamp
 ```
 
+#### `games` tabel
+Slaat spel informatie op:
+```sql
+- id: text (primary key, UUID)
+- created_at: timestamp (automatisch)
+```
+
 ### Supabase Setup Instructies
 
 1. **Maak een Supabase account** op [supabase.com](https://supabase.com)
@@ -115,13 +168,20 @@ Slaat spelstatistieken op:
 CREATE TABLE profiles (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Maak games tabel
+CREATE TABLE games (
+  id TEXT PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Maak dart_stats tabel
 CREATE TABLE dart_stats (
   id SERIAL PRIMARY KEY,
-  game_id TEXT NOT NULL,
+  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   player_id INTEGER REFERENCES profiles(id) ON DELETE CASCADE,
   -- Averages
   three_dart_avg NUMERIC,
@@ -156,7 +216,12 @@ CREATE INDEX idx_dart_stats_player_id ON dart_stats(player_id);
 CREATE INDEX idx_dart_stats_game_id ON dart_stats(game_id);
 ```
 
-4. **Stel Row Level Security (RLS) in**:
+4. **Stel Storage bucket in voor profielfoto's**:
+   - Ga naar Storage in je Supabase dashboard
+   - Maak een nieuwe bucket genaamd `avatars`
+   - Stel de bucket in als public (of gebruik RLS policies)
+
+5. **Stel Row Level Security (RLS) in**:
    - Ga naar Authentication > Policies in je Supabase dashboard
    - Voor de `profiles` tabel, voeg deze policies toe:
 
@@ -186,12 +251,44 @@ TO public
 USING (true);
 ```
 
-5. **Haal je API keys op**:
+   - Voor de `games` tabel:
+
+```sql
+-- Allow public to insert games
+CREATE POLICY "Allow public insert on games"
+ON games FOR INSERT
+TO public
+WITH CHECK (true);
+
+-- Allow public to delete games
+CREATE POLICY "Allow public delete on games"
+ON games FOR DELETE
+TO public
+USING (true);
+```
+
+   - Voor de `dart_stats` tabel:
+
+```sql
+-- Allow public to insert dart_stats
+CREATE POLICY "Allow public insert on dart_stats"
+ON dart_stats FOR INSERT
+TO public
+WITH CHECK (true);
+
+-- Allow public to read dart_stats
+CREATE POLICY "Allow public read on dart_stats"
+ON dart_stats FOR SELECT
+TO public
+USING (true);
+```
+
+6. **Haal je API keys op**:
    - Ga naar Project Settings > API
    - Kopieer de "Project URL" (dit is je `NEXT_PUBLIC_SUPABASE_URL`)
    - Kopieer de "anon public" key (dit is je `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 
-6. **Maak een `.env.local` bestand** in de root van je project:
+7. **Maak een `.env.local` bestand** in de root van je project:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url-here
@@ -236,12 +333,15 @@ npm run dev
 dartclub/
 ├── app/                          # Next.js App Router directory
 │   ├── components/               # Herbruikbare React componenten
-│   │   ├── FontLoader.tsx        # Laadt Gilroy font van CDN
-│   │   └── HamburgerMenu.tsx     # Side menu component (niet gebruikt)
+│   │   └── FontLoader.tsx       # Laadt Gilroy font van CDN
 │   ├── play501game/              # 501 spel pagina
-│   │   └── page.tsx              # Hoofdspel logica en UI
+│   │   └── page.tsx             # Hoofdspel logica en UI
 │   ├── speel-501/                # Spel setup pagina
-│   │   └── page.tsx              # Speler selectie en instellingen
+│   │   └── page.tsx             # Speler selectie en instellingen
+│   ├── profielen/                # Profielbeheer pagina
+│   │   └── page.tsx             # Spelersprofielen beheren
+│   ├── statistieken/             # Statistieken pagina
+│   │   └── page.tsx             # Speler statistieken bekijken
 │   ├── favicon.ico               # Website favicon
 │   ├── globals.css               # Global CSS styles
 │   ├── layout.tsx                # Root layout met metadata
@@ -276,6 +376,7 @@ De app gebruikt React's ingebouwde state management:
 - `useState` voor lokale component state
 - `useEffect` voor side effects (data fetching, event listeners)
 - `useCallback` voor geoptimaliseerde functies in dependencies
+- `useRef` voor persistente waarden zonder re-renders
 
 ### Data Flow
 1. **Speler Setup** (`speel-501/page.tsx`):
@@ -304,14 +405,21 @@ De app gebruikt React's ingebouwde state management:
 
 #### Coin Flip & Wheel Spin
 - CSS 3D transforms voor animaties
-- Math.random() voor willekeurige resultaten
-- Smooth transitions met cubic-bezier easing
+- `requestAnimationFrame` voor soepele animaties
+- Crypto.getRandomValues voor veilige random generatie
+- Exacte eindpositie berekening (0/180 voor coin, player index voor wheel)
 
 #### Score Tracking
 - Real-time score berekening
-- Bust detection (score onder 0 of niet uit te gooien)
+- Bust detection (score onder 0, op 1, of niet uit te gooien)
 - Checkout suggestions
 - Double percentage tracking
+- Spel geschiedenis voor undo functionaliteit
+
+#### Profielbeheer
+- Supabase Storage voor profielfoto's
+- Avatar upload en verwijdering
+- Fallback naar initialen als geen foto
 
 ## 🔒 Beveiliging
 
@@ -319,6 +427,7 @@ De app gebruikt React's ingebouwde state management:
 - **Environment Variables**: API keys worden niet in code opgeslagen
 - **HTTPS Only**: Device motion API vereist beveiligde verbinding
 - **Input Validation**: Client-side validatie voor gebruikersinput
+- **Cascade Deletes**: Database constraints zorgen voor data integriteit
 
 ## 🐛 Troubleshooting
 
@@ -339,15 +448,18 @@ De app gebruikt React's ingebouwde state management:
 - Android: Meestal geen extra instellingen nodig
 - Check browser console voor permission errors
 
-## 📝 Toekomstige Features
+### Profielfoto's niet zichtbaar
+- Controleer of Storage bucket `avatars` bestaat
+- Verifieer dat bucket public is of RLS policies correct zijn
+- Check of avatar_url correct wordt opgeslagen in database
 
-- [ ] Authenticatie systeem (Supabase Auth)
-- [ ] Speler statistieken dashboard
-- [ ] Achievements systeem
-- [ ] Multiplayer real-time games
-- [ ] Spel geschiedenis
-- [ ] Export statistieken
-- [ ] Dark mode toggle
+## 📝 Code Kwaliteit
+
+- TypeScript voor type safety
+- ESLint voor code kwaliteit
+- Geen onnodige console.log statements (alleen error logging)
+- Geen commented out code
+- Clean code principes
 
 ## 📄 Licentie
 

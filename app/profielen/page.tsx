@@ -123,7 +123,6 @@ export default function Profielen() {
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
-          console.log("Attempting to delete profile with id:", profileId);
 
           // Eerst halen we alle games op die bij dit profiel horen
           const { data: gamesData, error: gamesFetchError } = await supabase
@@ -162,7 +161,6 @@ export default function Profielen() {
                 return;
               }
             } else {
-              console.log(`Deleted ${statsData?.length || 0} dart_stats records for games:`, gameIds);
             }
           }
 
@@ -212,7 +210,6 @@ export default function Profielen() {
                 return;
               }
             } else {
-              console.log(`Deleted ${deletedGamesData?.length || 0} games records for profile:`, profileId);
             }
           }
 
@@ -256,7 +253,6 @@ export default function Profielen() {
             return;
           }
 
-          console.log("Successfully deleted profile:", data);
 
           setAlertMessage({ message: "Profiel succesvol verwijderd!", type: "success" });
 

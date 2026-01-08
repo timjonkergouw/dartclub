@@ -106,28 +106,7 @@ export default function Statistieken() {
         return;
       }
 
-      // Debug: log hoeveel records er zijn en welke finishes
-      console.log(`📊 Fetched ${data.length} stats records for player ${playerId}`);
       const finishRecords = data.filter((stat: DartStat) => stat.finish !== null && stat.finish >= 2 && stat.finish <= 170);
-      console.log(`🎯 Found ${finishRecords.length} records with finishes:`, finishRecords.map((r: DartStat) => ({ finish: r.finish, game_id: r.game_id, created_at: r.created_at })));
-      
-      // Check voor dubbele game_id's (dit zou niet moeten gebeuren)
-      const gameIds = data.map((r: DartStat) => r.game_id);
-      const duplicateGameIds = gameIds.filter((id: string, index: number) => gameIds.indexOf(id) !== index);
-      if (duplicateGameIds.length > 0) {
-        console.warn(`⚠️ WARNING: Found duplicate game_id's:`, duplicateGameIds);
-      }
-      
-      // Check voor dubbele finishes met dezelfde game_id en created_at (dit zou niet moeten gebeuren)
-      const finishGroups = new Map<string, number>();
-      finishRecords.forEach((r: DartStat) => {
-        const key = `${r.game_id}_${r.created_at}_${r.finish}`;
-        finishGroups.set(key, (finishGroups.get(key) || 0) + 1);
-      });
-      const duplicates = Array.from(finishGroups.entries()).filter(([, count]) => count > 1);
-      if (duplicates.length > 0) {
-        console.warn(`⚠️ WARNING: Found duplicate finishes with same game_id and created_at:`, duplicates);
-      }
 
       // Aggregeer de statistieken
       const aggregated: AggregatedStats = {

@@ -81,7 +81,6 @@ export default function Speel501() {
         setModalMode("select");
         setIsModalOpen(false);
       } else {
-        console.warn("No data returned from insert");
         alert("Profiel aangemaakt maar geen data ontvangen. Probeer opnieuw.");
       }
     } catch (error: unknown) {
