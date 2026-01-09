@@ -211,12 +211,13 @@ function Play501GameContent() {
       updatedStatsCopy.set(currentPlayerId, updatedStat);
 
       // Leg gewonnen - verhoog legsWon voor de winnende speler
+      // totalDarts is al bijgewerkt tijdens normale beurten, voeg alleen checkout darts toe
       const newLegsWon = currentState.legsWon + 1;
       updatedStatesCopy[currentPlayerIndex] = {
         ...currentState,
         score: 501, // Reset voor volgende leg
         totalScore: currentState.totalScore + score,
-        totalDarts: 0, // Reset darts voor nieuwe leg
+        totalDarts: currentState.totalDarts + doubleDarts, // Voeg alleen checkout darts toe (dartsInCurrentLeg zit al in totalDarts)
         dartsInCurrentLeg: 0, // Reset darts voor nieuwe leg
         lastScore: score,
         turns: 0, // Reset turns voor nieuwe leg
@@ -224,11 +225,12 @@ function Play501GameContent() {
       };
 
       // Reset alle spelers' scores en darts voor nieuwe leg
+      // totalDarts is al correct bijgewerkt tijdens beurten, behoud het
       updatedStatesCopy.forEach((state, idx) => {
         if (idx !== currentPlayerIndex) {
           state.score = 501;
-          state.totalDarts = 0;
-          state.dartsInCurrentLeg = 0;
+          // totalDarts blijft zoals het is (al correct bijgewerkt)
+          state.dartsInCurrentLeg = 0; // Reset alleen darts voor nieuwe leg
           state.turns = 0;
         }
       });
@@ -389,12 +391,13 @@ function Play501GameContent() {
     updatedStatsCopy.set(currentPlayerId, updatedStat);
 
     // Leg gewonnen - verhoog legsWon voor de winnende speler
+    // totalDarts is al bijgewerkt tijdens normale beurten, voeg alleen checkout darts toe
     const newLegsWon = currentState.legsWon + 1;
     updatedStatesCopy[currentPlayerIndex] = {
       ...currentState,
       score: 501, // Reset voor volgende leg
       totalScore: currentState.totalScore + score,
-      totalDarts: 0, // Reset darts voor nieuwe leg (wordt per leg geteld)
+      totalDarts: currentState.totalDarts + checkoutDarts, // Voeg alleen checkout darts toe (dartsInCurrentLeg zit al in totalDarts)
       dartsInCurrentLeg: 0, // Reset darts voor nieuwe leg
       lastScore: score,
       turns: 0, // Reset turns voor nieuwe leg
@@ -402,11 +405,12 @@ function Play501GameContent() {
     };
 
     // Reset alle spelers' scores en darts voor nieuwe leg
+    // totalDarts is al correct bijgewerkt tijdens beurten, behoud het
     updatedStatesCopy.forEach((state, idx) => {
       if (idx !== currentPlayerIndex) {
         state.score = 501;
-        state.totalDarts = 0; // Reset darts voor nieuwe leg
-        state.dartsInCurrentLeg = 0; // Reset darts voor nieuwe leg
+        // totalDarts blijft zoals het is (al correct bijgewerkt)
+        state.dartsInCurrentLeg = 0; // Reset alleen darts voor nieuwe leg
         state.turns = 0; // Reset turns voor nieuwe leg
       }
     });
@@ -959,7 +963,7 @@ function Play501GameContent() {
   };
 
   const calculateAverage = (state: PlayerGameState): number => {
-    if (state.turns === 0) return 0;
+    if (state.totalDarts === 0) return 0;
     return Math.round((state.totalScore / state.totalDarts) * 3 * 100) / 100;
   };
 
@@ -1537,7 +1541,42 @@ function Play501GameContent() {
   // Start Popup
   if (showStartPopup) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A294F] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#0A294F] p-4 relative">
+        {/* Terug pijltje linksboven */}
+        <div className="absolute top-4 left-4 z-50">
+          <button
+            onClick={() => {
+              if (startMethod) {
+                // Als we in een DIY scherm zitten, ga terug naar menu
+                setStartMethod(null);
+                setSelectedOrder([]);
+                setWheelRotation(0);
+                setCoinResult(null);
+                setCoinRotation(0);
+              } else {
+                // Als we in het menu zitten, ga naar speel-501
+                router.push("/speel-501");
+              }
+            }}
+            className="w-10 h-10 flex items-center justify-center bg-[#0A294F] text-white rounded-full hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 18L9 12L15 6"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
         <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-2xl w-full max-w-md">
           <h2 className="text-2xl font-bold text-[#000000] mb-6 text-center">
             Kies startmethode
@@ -1904,7 +1943,7 @@ function Play501GameContent() {
               {/* Statistieken onderin gecentreerd */}
               <div className="text-xs space-y-1 text-white/80 text-center mt-4">
                 <div>3-dart avg: {calculateAverage(gameStates[0])}</div>
-                <div>Darts: {gameStates[0].totalDarts}</div>
+                <div>Darts: {gameStates[0].dartsInCurrentLeg}</div>
                 <div>Laatst: {gameStates[0].lastScore}</div>
               </div>
             </div>
@@ -1958,7 +1997,7 @@ function Play501GameContent() {
               {/* Statistieken onderin gecentreerd */}
               <div className="text-xs space-y-1 text-[#7E838F] text-center mt-4">
                 <div>3-dart avg: {calculateAverage(gameStates[1])}</div>
-                <div>Darts: {gameStates[1].totalDarts}</div>
+                <div>Darts: {gameStates[1].dartsInCurrentLeg}</div>
                 <div>Laatst: {gameStates[1].lastScore}</div>
               </div>
             </div>
@@ -2538,3 +2577,8 @@ export default function Play501Game() {
     </Suspense>
   );
 }
+
+
+
+
+

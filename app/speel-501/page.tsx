@@ -131,7 +131,7 @@ export default function Speel501() {
     if (typeof window === "undefined") return;
 
     try {
-      const { data, error } = await supabase.from("profiles").select("*");
+      const { data, error } = await supabase.from("profiles").select("*").order("username", { ascending: true });
       if (error) {
         console.error("Error fetching profiles:", error);
         console.error("Error details:", {
