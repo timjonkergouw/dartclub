@@ -83,6 +83,22 @@ export default function Home() {
             );
           }
 
+          // Link voor "Speel 501 Borrelmodus"
+          if (item.text === "Speel 501 Borrelmodus") {
+            return (
+              <Link
+                key={index}
+                href="/speel501borrelmodus"
+                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+                style={{
+                  minHeight: "64px",
+                }}
+              >
+                {ButtonContent}
+              </Link>
+            );
+          }
+
           // Link voor "Statistieken"
           if (item.text === "Statistieken") {
             return (

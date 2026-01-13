@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-export default function Speel501() {
+export default function Speel501Borrelmodus() {
   const [firstToBestOf, setFirstToBestOf] = useState<"first-to" | "best-of">("first-to");
   const [setsLegs, setSetsLegs] = useState<"sets" | "legs">("sets");
   const [counter, setCounter] = useState(1);
@@ -15,6 +15,8 @@ export default function Speel501() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"select" | "create">("select");
   const [selectedPlayers, setSelectedPlayers] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
+  const [playerDifficulties, setPlayerDifficulties] = useState<Map<number, "easy" | "medium" | "hard" | "extreme">>(new Map());
+  const [sipMultiplier, setSipMultiplier] = useState(1);
 
   const incrementCounter = () => {
     setCounter(counter + 1);
@@ -117,12 +119,20 @@ export default function Speel501() {
   const selectPlayer = (player: { id: number; username: string; avatar_url?: string | null }) => {
     if (!selectedPlayers.find((p) => p.id === player.id)) {
       setSelectedPlayers([...selectedPlayers, player]);
+      // Set default difficulty to "medium" for new player
+      setPlayerDifficulties(prev => new Map(prev).set(player.id, "medium"));
     }
     setModalMode("select");
   };
 
   const removePlayer = (playerId: number) => {
     setSelectedPlayers(selectedPlayers.filter((p) => p.id !== playerId));
+    // Remove difficulty when player is removed
+    setPlayerDifficulties(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(playerId);
+      return newMap;
+    });
   };
 
   const fetchProfiles = async () => {
@@ -531,13 +541,111 @@ export default function Speel501() {
         </div>
       </div>
 
+      {/* Borrelinstellingen */}
+      <div className="w-full max-w-md mx-auto mt-4 mb-4">
+        <div className="bg-[#E8F0FF] rounded-2xl p-4 shadow-md">
+          <div className="flex items-center gap-2 mb-4">
+            <Image
+              src="/beer.png"
+              alt="Borrelinstellingen"
+              width={24}
+              height={24}
+              className="object-contain"
+            />
+            <div className="text-[#000000] font-black text-base uppercase tracking-wide">
+              BORRELINSTELLINGEN
+            </div>
+          </div>
+
+          {selectedPlayers.length === 0 ? (
+            <div className="text-sm text-[#7E838F]">
+              Selecteer eerst minimaal één speler om borrelinstellingen te kiezen.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {selectedPlayers.map((player) => (
+                <div key={player.id} className="bg-[#0A294F] rounded-xl p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    {player.avatar_url ? (
+                      <Image
+                        src={player.avatar_url}
+                        alt={player.username}
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover"
+                        style={{ width: "40px", height: "40px" }}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#E8F0FF] flex items-center justify-center text-[#0A294F] font-bold text-lg">
+                        {player.username.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-[#E8F0FF] font-semibold text-base">
+                      {player.username}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(["easy", "medium", "hard", "extreme"] as const).map((difficulty) => (
+                      <button
+                        key={difficulty}
+                        onClick={() => {
+                          setPlayerDifficulties(prev => new Map(prev).set(player.id, difficulty));
+                        }}
+                        className={`py-1.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 ${playerDifficulties.get(player.id) === difficulty
+                          ? "bg-[#28C7D8] text-white"
+                          : "bg-[#E8F0FF] text-[#000000]"
+                          }`}
+                      >
+                        {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Slokken multiply */}
+          <div className="mt-4 pt-4 border-t border-[#0A294F] border-opacity-20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[#000000] font-semibold text-base">
+                  Slokken multiply
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSipMultiplier(prev => Math.max(1, prev - 1))}
+                  className="w-9 h-9 flex items-center justify-center bg-[#0A294F] text-[#E8F0FF] rounded-full hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+                  aria-label="Verlaag slokken multiplier"
+                >
+                  <span className="text-lg leading-none">−</span>
+                </button>
+                <div className="min-w-[40px] text-center text-xl font-bold text-[#000000]">
+                  {sipMultiplier}x
+                </div>
+                <button
+                  onClick={() => setSipMultiplier(prev => prev + 1)}
+                  className="w-9 h-9 flex items-center justify-center bg-[#0A294F] text-[#E8F0FF] rounded-full hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+                  aria-label="Verhoog slokken multiplier"
+                >
+                  <span className="text-lg leading-none">+</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Start Game Button - Onderaan */}
       {selectedPlayers.length > 0 && (
         <div className="w-full max-w-md mx-auto mt-auto mb-4">
           <Link
-            href={`/play501game?players=${encodeURIComponent(
+            href={`/play501borrelgame?players=${encodeURIComponent(
               JSON.stringify(selectedPlayers)
-            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=false`}
+            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=false&difficulties=${encodeURIComponent(
+              JSON.stringify(Object.fromEntries(playerDifficulties))
+            )}&sipMultiplier=${sipMultiplier}`}
             className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
           >
             Start Game
@@ -547,4 +655,3 @@ export default function Speel501() {
     </div>
   );
 }
-
