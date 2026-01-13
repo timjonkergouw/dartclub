@@ -96,6 +96,8 @@ function Play501GameContent() {
     score: number;
     sips: number;
     isBedAndBreakfast?: boolean;
+    is180?: boolean;
+    otherPlayers?: Player[];
   } | null>(null);
 
   useEffect(() => {
@@ -557,8 +559,22 @@ function Play501GameContent() {
     const currentState = gameStates[currentPlayerIndex];
     if (!currentState) return;
 
-    // Speciale check voor Bed and Breakfast (score 26)
-    if (score === 26) {
+    // Speciale check voor 180 - alle andere spelers moeten drinken
+    if (score === 180) {
+      const otherPlayers = players.filter(p => p.id !== currentState.player.id);
+      const sips = sipMultiplier * 1;
+      setDrinkPopupInfo({
+        player: currentState.player,
+        threshold: 180,
+        score: 180,
+        sips,
+        isBedAndBreakfast: false,
+        is180: true,
+        otherPlayers,
+      });
+      setShowDrinkPopup(true);
+    } else if (score === 26) {
+      // Speciale check voor Bed and Breakfast (score 26)
       const sips = sipMultiplier * 1;
       setDrinkPopupInfo({
         player: currentState.player,
@@ -566,6 +582,7 @@ function Play501GameContent() {
         score: 26,
         sips,
         isBedAndBreakfast: true,
+        is180: false,
       });
       setShowDrinkPopup(true);
     } else {
@@ -587,6 +604,7 @@ function Play501GameContent() {
           score,
           sips,
           isBedAndBreakfast: false,
+          is180: false,
         });
         setShowDrinkPopup(true);
       }
@@ -1973,7 +1991,9 @@ function Play501GameContent() {
 
       {/* Spelers display */}
       {isTwoPlayers ? (
-        <div className="flex mb-6 rounded-2xl overflow-hidden relative">
+        <div className="grid grid-cols-12 mb-6">
+          <div className="col-span-12 md:col-span-8 md:col-start-3">
+            <div className="flex rounded-2xl overflow-hidden relative">
           {/* Speler 1 - Links */}
           <div
             className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
@@ -2081,9 +2101,12 @@ function Play501GameContent() {
               </div>
             </div>
           </div>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="mb-6 space-y-2">
+        <div className="grid grid-cols-12 mb-6">
+          <div className="col-span-12 md:col-span-8 md:col-start-3 space-y-2">
           {gameStates.map((state, index) => (
             <div
               key={state.player.id}
@@ -2158,20 +2181,27 @@ function Play501GameContent() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {/* Wie is aan de beurt - onder het scorebord */}
-      <div className="text-white text-xl font-semibold mt-2 text-left">
-        {gameStates[currentPlayerIndex].player.username} is aan de beurt!
+      <div className="grid grid-cols-12">
+        <div className="col-span-12 md:col-span-8 md:col-start-3">
+          <div className="text-white text-xl font-semibold mt-2 text-left">
+            {gameStates[currentPlayerIndex].player.username} is aan de beurt!
+          </div>
+        </div>
       </div>
 
       {/* Huidige invoer balkje */}
-      <div className="mb-6 w-full">
-        <div className="bg-[#EEEEEE] rounded-lg px-6 py-4 w-full">
-          <span className="text-5xl font-bold text-[#000000] text-left block">
-            {inputScore || "0"}
-          </span>
+      <div className="grid grid-cols-12 mb-6">
+        <div className="col-span-12 md:col-span-8 md:col-start-3">
+          <div className="bg-[#EEEEEE] rounded-lg px-6 py-4 w-full">
+            <span className="text-5xl font-bold text-[#000000] text-left block">
+              {inputScore || "0"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -2584,20 +2614,52 @@ function Play501GameContent() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="text-center mb-6">
-                  {/* Image based on threshold or bed and breakfast */}
+                  {/* Image based on threshold, bed and breakfast, or 180 */}
                   <div className="flex justify-center mb-4">
                     <Image
-                      src={drinkPopupInfo.isBedAndBreakfast ? "/bandb.png" : `/_${drinkPopupInfo.threshold}.png`}
-                      alt={drinkPopupInfo.isBedAndBreakfast ? "Bed and Breakfast" : `Threshold ${drinkPopupInfo.threshold}`}
+                      src={
+                        drinkPopupInfo.is180 
+                          ? "/180.png" 
+                          : drinkPopupInfo.isBedAndBreakfast 
+                            ? "/bandb.png" 
+                            : `/_${drinkPopupInfo.threshold}.png`
+                      }
+                      alt={
+                        drinkPopupInfo.is180 
+                          ? "180" 
+                          : drinkPopupInfo.isBedAndBreakfast 
+                            ? "Bed and Breakfast" 
+                            : `Threshold ${drinkPopupInfo.threshold}`
+                      }
                       width={200}
                       height={200}
                       className="object-contain"
                     />
                   </div>
                   <h2 className="text-[#0A294F] font-semibold text-xl mb-2">
-                    {drinkPopupInfo.isBedAndBreakfast ? "Bed and breakfast" : "Slokken time!"}
+                    {drinkPopupInfo.is180 
+                      ? "180!" 
+                      : drinkPopupInfo.isBedAndBreakfast 
+                        ? "Bed and breakfast" 
+                        : "Slokken time!"}
                   </h2>
-                  {drinkPopupInfo.isBedAndBreakfast ? (
+                  {drinkPopupInfo.is180 ? (
+                    <>
+                      <p className="text-[#0A294F] text-sm mb-2">
+                        {drinkPopupInfo.player.username} gooide 180!
+                      </p>
+                      <p className="text-[#0A294F] text-sm mb-2">
+                        Alle andere spelers moeten biertje adten of een shotje nemen:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2 mt-2">
+                        {drinkPopupInfo.otherPlayers?.map((player) => (
+                          <span key={player.id} className="text-[#0A294F] font-semibold text-sm">
+                            {player.username}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : drinkPopupInfo.isBedAndBreakfast ? (
                     <>
                       <p className="text-[#0A294F] text-sm mb-2">
                         Ai, 26 dat betekent {drinkPopupInfo.sips} slok{drinkPopupInfo.sips !== 1 ? "ken" : ""}

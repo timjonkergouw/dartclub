@@ -33,7 +33,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-start pt-4 pb-6 px-4 relative z-50">
       {/* Logo */}
-      <div className="mb-6 flex justify-center relative z-50">
+      <div className="mb-6 flex justify-center relative z-50 animate-fade-in-down">
         <Image
           src="/logo wit dartclub.png"
           alt="DartClub Logo"
@@ -73,9 +73,11 @@ export default function Home() {
               <Link
                 key={index}
                 href="/speel-501"
-                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-all duration-300 hover:shadow-lg hover:bg-[#D0E0FF] hover:scale-[1.02] touch-manipulation flex items-center gap-3 animate-fade-in-up"
                 style={{
                   minHeight: "64px",
+                  animationDelay: `${index * 0.1}s`,
+                  opacity: 0,
                 }}
               >
                 {ButtonContent}
@@ -89,9 +91,11 @@ export default function Home() {
               <Link
                 key={index}
                 href="/speel501borrelmodus"
-                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-all duration-300 hover:shadow-lg hover:bg-[#D0E0FF] hover:scale-[1.02] touch-manipulation flex items-center gap-3 animate-fade-in-up"
                 style={{
                   minHeight: "64px",
+                  animationDelay: `${index * 0.1}s`,
+                  opacity: 0,
                 }}
               >
                 {ButtonContent}
@@ -105,9 +109,11 @@ export default function Home() {
               <Link
                 key={index}
                 href="/statistieken"
-                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-all duration-300 hover:shadow-lg hover:bg-[#D0E0FF] hover:scale-[1.02] touch-manipulation flex items-center gap-3 animate-fade-in-up"
                 style={{
                   minHeight: "64px",
+                  animationDelay: `${index * 0.1}s`,
+                  opacity: 0,
                 }}
               >
                 {ButtonContent}
@@ -121,9 +127,11 @@ export default function Home() {
               <Link
                 key={index}
                 href="/profielen"
-                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+                className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-all duration-300 hover:shadow-lg hover:bg-[#D0E0FF] hover:scale-[1.02] touch-manipulation flex items-center gap-3 animate-fade-in-up"
                 style={{
                   minHeight: "64px",
+                  animationDelay: `${index * 0.1}s`,
+                  opacity: 0,
                 }}
               >
                 {ButtonContent}
@@ -135,9 +143,11 @@ export default function Home() {
           return (
             <button
               key={index}
-              className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-transform duration-150 hover:shadow-lg hover:bg-[#D0E0FF] touch-manipulation flex items-center gap-3"
+              className="w-full bg-[#E8F0FF] text-[#000000] py-4 px-4 rounded-2xl shadow-md active:scale-95 transition-all duration-300 hover:shadow-lg hover:bg-[#D0E0FF] hover:scale-[1.02] touch-manipulation flex items-center gap-3 animate-fade-in-up"
               style={{
                 minHeight: "64px", // Grote touch targets voor mobile
+                animationDelay: `${index * 0.1}s`,
+                opacity: 0,
               }}
             >
               {ButtonContent}

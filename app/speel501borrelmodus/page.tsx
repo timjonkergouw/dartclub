@@ -168,9 +168,9 @@ export default function Speel501Borrelmodus() {
   return (
     <div className="min-h-screen flex flex-col items-start pt-4 pb-6 px-4 relative z-50">
       {/* Terug pijltje linksboven */}
-      <div className="absolute top-4 left-4 z-50">
+      <div className="absolute top-4 left-4 z-50 animate-slide-in-left">
         <Link href="/">
-          <button className="w-10 h-10 flex items-center justify-center bg-[#0A294F] text-white rounded-full hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation">
+          <button className="w-10 h-10 flex items-center justify-center bg-[#0A294F] text-white rounded-full hover:bg-[#0d3a6a] active:scale-95 transition-all duration-300 hover:scale-110 touch-manipulation">
             <svg
               width="20"
               height="20"
@@ -191,21 +191,21 @@ export default function Speel501Borrelmodus() {
       </div>
 
       {/* Logo rechtsboven */}
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-4 right-4 z-50 animate-slide-in-right">
         <Link href="/">
           <Image
             src="/logo wit dartclub.png"
             alt="DartClub Logo"
             width={60}
             height={60}
-            className="object-contain"
+            className="object-contain transition-transform duration-300 hover:scale-110"
           />
         </Link>
       </div>
 
       {/* Profiel vakje - midden boven */}
-      <div className="w-full max-w-md mx-auto mt-16 mb-6">
-        <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-md">
+      <div className="w-full max-w-md mx-auto mt-16 mb-6 animate-fade-in-up">
+        <div className="bg-[#E8F0FF] rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Image
               src="/players.png"
@@ -415,8 +415,8 @@ export default function Speel501Borrelmodus() {
       )}
 
       {/* Tabbeltjes - Geïntegreerd blok */}
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-[#E8F0FF] rounded-2xl p-3 shadow-md">
+      <div className="w-full max-w-md mx-auto animate-fade-in-up" style={{ animationDelay: "0.2s", opacity: 0 }}>
+        <div className="bg-[#E8F0FF] rounded-2xl p-3 shadow-md transition-all duration-300 hover:shadow-lg">
           <div className="flex items-center gap-2 mb-3">
             <Image
               src="/setting.png"
@@ -542,8 +542,8 @@ export default function Speel501Borrelmodus() {
       </div>
 
       {/* Borrelinstellingen */}
-      <div className="w-full max-w-md mx-auto mt-4 mb-4">
-        <div className="bg-[#E8F0FF] rounded-2xl p-4 shadow-md">
+      <div className="w-full max-w-md mx-auto mt-4 mb-4 animate-fade-in-up" style={{ animationDelay: "0.3s", opacity: 0 }}>
+        <div className="bg-[#E8F0FF] rounded-2xl p-4 shadow-md transition-all duration-300 hover:shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Image
               src="/beer.png"
@@ -638,20 +638,27 @@ export default function Speel501Borrelmodus() {
       </div>
 
       {/* Start Game Button - Onderaan */}
-      {selectedPlayers.length > 0 && (
-        <div className="w-full max-w-md mx-auto mt-auto mb-4">
+      <div className="w-full max-w-md mx-auto mt-auto mb-4 animate-scale-in" style={{ animationDelay: "0.4s", opacity: 0 }}>
+        {selectedPlayers.length >= 2 ? (
           <Link
             href={`/play501borrelgame?players=${encodeURIComponent(
               JSON.stringify(selectedPlayers)
             )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=false&difficulties=${encodeURIComponent(
               JSON.stringify(Object.fromEntries(playerDifficulties))
             )}&sipMultiplier=${sipMultiplier}`}
-            className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation"
+            className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center hover:bg-[#22a8b7] active:scale-95 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl touch-manipulation"
           >
             Start Game
           </Link>
-        </div>
-      )}
+        ) : (
+          <button
+            disabled
+            className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center opacity-50 cursor-not-allowed transition-all duration-300"
+          >
+            Start Game
+          </button>
+        )}
+      </div>
     </div>
   );
 }
