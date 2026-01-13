@@ -5,6 +5,15 @@ import FontLoader from "./components/FontLoader";
 export const metadata: Metadata = {
   title: "DartClub - Speel 501 en meer",
   description: "Moderne mobile-first dart app voor het spelen van 501 en het bijhouden van statistieken",
+  manifest: "/site.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DartClub",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
