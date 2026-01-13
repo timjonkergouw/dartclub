@@ -1928,17 +1928,17 @@ function Play501GameContent() {
                   <div className="flex items-center justify-center gap-6 flex-1 w-full">
                     {/* Legs en Sets */}
                     <div className="text-white text-center">
-                      <div className="text-lg font-bold">
+                      <div className="text-sm font-bold">
                         L {gameStates[0].legsWon}
                       </div>
                       {gameType === "sets" && (
-                        <div className="text-lg font-bold">
+                        <div className="text-sm font-bold">
                           S {gameStates[0].setsWon}
                         </div>
                       )}
                     </div>
                     {/* Score */}
-                    <div className="text-5xl font-bold text-white">
+                    <div className="text-4xl font-bold text-white ml-2">
                       {gameStates[0].score}
                     </div>
                   </div>
@@ -1982,17 +1982,17 @@ function Play501GameContent() {
                   <div className="flex items-center justify-center gap-6 flex-1 w-full">
                     {/* Legs en Sets */}
                     <div className="text-[#000000] text-center">
-                      <div className="text-lg font-bold">
+                      <div className="text-sm font-bold">
                         L {gameStates[1].legsWon}
                       </div>
                       {gameType === "sets" && (
-                        <div className="text-lg font-bold">
+                        <div className="text-sm font-bold">
                           S {gameStates[1].setsWon}
                         </div>
                       )}
                     </div>
                     {/* Score */}
-                    <div className="text-5xl font-bold text-[#000000]">
+                    <div className="text-4xl font-bold text-[#000000] ml-2">
                       {gameStates[1].score}
                     </div>
                   </div>
@@ -2062,21 +2062,21 @@ function Play501GameContent() {
                     }`}>
                     {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
                     {gameType === "sets" && (
-                      <div className={players.length > 3 ? "block sm:hidden text-base" : "hidden"}>
+                      <div className={players.length > 3 ? "block sm:hidden text-xs" : "hidden"}>
                         L {state.legsWon} · S {state.setsWon}
                       </div>
                     )}
-                    <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
+                    <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
                       L {state.legsWon}
                     </div>
                     {gameType === "sets" && (
-                      <div className={players.length > 3 ? "hidden sm:block text-lg" : "block text-lg"}>
+                      <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
                         S {state.setsWon}
                       </div>
                     )}
                   </div>
                   <div
-                    className={`text-2xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                    className={`text-xl font-bold ml-2 ${index % 2 === 0 ? "text-white" : "text-[#000000]"
                       }`}
                   >
                     {state.score}
