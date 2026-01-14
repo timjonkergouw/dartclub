@@ -97,6 +97,8 @@ function Play501GameContent() {
     sips: number;
     isBedAndBreakfast?: boolean;
     is180?: boolean;
+    isHighScore?: boolean;
+    highScoreThreshold?: number;
     otherPlayers?: Player[];
   } | null>(null);
 
@@ -559,8 +561,11 @@ function Play501GameContent() {
     const currentState = gameStates[currentPlayerIndex];
     if (!currentState) return;
 
+    // Alleen pop-ups tonen als de resterende score 100 of hoger is
+    const shouldShowPopups = currentState.score >= 100;
+
     // Speciale check voor 180 - alle andere spelers moeten drinken
-    if (score === 180) {
+    if (score === 180 && shouldShowPopups) {
       const otherPlayers = players.filter(p => p.id !== currentState.player.id);
       const sips = sipMultiplier * 1;
       setDrinkPopupInfo({
@@ -570,10 +575,11 @@ function Play501GameContent() {
         sips,
         isBedAndBreakfast: false,
         is180: true,
+        isHighScore: false,
         otherPlayers,
       });
       setShowDrinkPopup(true);
-    } else if (score === 26) {
+    } else if (score === 26 && shouldShowPopups) {
       // Speciale check voor Bed and Breakfast (score 26)
       const sips = sipMultiplier * 1;
       setDrinkPopupInfo({
@@ -583,28 +589,54 @@ function Play501GameContent() {
         sips,
         isBedAndBreakfast: true,
         is180: false,
+        isHighScore: false,
       });
       setShowDrinkPopup(true);
     } else {
       // Borrellogica: check of score onder de ingestelde grens ligt
       const difficulty = playerDifficulties.get(currentState.player.id) ?? "medium";
-      const thresholds: Record<"easy" | "medium" | "hard" | "extreme", number> = {
+      const lowThresholds: Record<"easy" | "medium" | "hard" | "extreme", number> = {
         easy: 25,
         medium: 30,
         hard: 40,
         extreme: 50,
       };
-      const threshold = thresholds[difficulty];
+      const lowThreshold = lowThresholds[difficulty];
 
-      if (score < threshold && score > 0) {
+      // Check voor hoge scores (boven de threshold)
+      const highThresholds: Record<"easy" | "medium" | "hard" | "extreme", number> = {
+        easy: 80,
+        medium: 100,
+        hard: 120,
+        extreme: 140,
+      };
+      const highThreshold = highThresholds[difficulty];
+
+      // Check eerst voor hoge score
+      if (score > highThreshold && shouldShowPopups) {
         const sips = sipMultiplier * 1;
         setDrinkPopupInfo({
           player: currentState.player,
-          threshold,
+          threshold: highThreshold,
           score,
           sips,
           isBedAndBreakfast: false,
           is180: false,
+          isHighScore: true,
+          highScoreThreshold: highThreshold,
+        });
+        setShowDrinkPopup(true);
+      } else if (score < lowThreshold && score > 0 && shouldShowPopups) {
+        // Check voor lage score
+        const sips = sipMultiplier * 1;
+        setDrinkPopupInfo({
+          player: currentState.player,
+          threshold: lowThreshold,
+          score,
+          sips,
+          isBedAndBreakfast: false,
+          is180: false,
+          isHighScore: false,
         });
         setShowDrinkPopup(true);
       }
@@ -2614,34 +2646,42 @@ function Play501GameContent() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="text-center mb-6">
-                  {/* Image based on threshold, bed and breakfast, or 180 */}
+                  {/* Image based on threshold, bed and breakfast, 180, or high score symbol */}
                   <div className="flex justify-center mb-4">
-                    <Image
-                      src={
-                        drinkPopupInfo.is180 
-                          ? "/180.png" 
-                          : drinkPopupInfo.isBedAndBreakfast 
-                            ? "/bandb.png" 
-                            : `/_${drinkPopupInfo.threshold}.png`
-                      }
-                      alt={
-                        drinkPopupInfo.is180 
-                          ? "180" 
-                          : drinkPopupInfo.isBedAndBreakfast 
-                            ? "Bed and Breakfast" 
-                            : `Threshold ${drinkPopupInfo.threshold}`
-                      }
-                      width={200}
-                      height={200}
-                      className="object-contain"
-                    />
+                    {drinkPopupInfo.isHighScore ? (
+                      <div className="text-[#0A294F] font-bold text-8xl">
+                        &gt;{drinkPopupInfo.highScoreThreshold}
+                      </div>
+                    ) : (
+                      <Image
+                        src={
+                          drinkPopupInfo.is180 
+                            ? "/180.png" 
+                            : drinkPopupInfo.isBedAndBreakfast 
+                              ? "/bandb.png" 
+                              : `/_${drinkPopupInfo.threshold}.png`
+                        }
+                        alt={
+                          drinkPopupInfo.is180 
+                            ? "180" 
+                            : drinkPopupInfo.isBedAndBreakfast 
+                              ? "Bed and Breakfast" 
+                              : `Threshold ${drinkPopupInfo.threshold}`
+                        }
+                        width={200}
+                        height={200}
+                        className="object-contain"
+                      />
+                    )}
                   </div>
                   <h2 className="text-[#0A294F] font-semibold text-xl mb-2">
                     {drinkPopupInfo.is180 
                       ? "180!" 
                       : drinkPopupInfo.isBedAndBreakfast 
                         ? "Bed and breakfast" 
-                        : "Slokken time!"}
+                        : drinkPopupInfo.isHighScore
+                          ? "Hoge score!"
+                          : "Slokken time!"}
                   </h2>
                   {drinkPopupInfo.is180 ? (
                     <>
@@ -2663,6 +2703,18 @@ function Play501GameContent() {
                     <>
                       <p className="text-[#0A294F] text-sm mb-2">
                         Ai, 26 dat betekent {drinkPopupInfo.sips} slok{drinkPopupInfo.sips !== 1 ? "ken" : ""}
+                      </p>
+                    </>
+                  ) : drinkPopupInfo.isHighScore ? (
+                    <>
+                      <p className="text-[#0A294F] text-sm mb-2">
+                        {drinkPopupInfo.player.username} gooide{" "}
+                        <span className="font-semibold">{drinkPopupInfo.score}</span>{" "}
+                        punten, meer dan{" "}
+                        <span className="font-semibold">{drinkPopupInfo.highScoreThreshold}</span>!
+                      </p>
+                      <p className="text-[#0A294F] font-semibold text-base">
+                        Neem {drinkPopupInfo.sips} slok{drinkPopupInfo.sips !== 1 ? "ken" : ""}
                       </p>
                     </>
                   ) : (
