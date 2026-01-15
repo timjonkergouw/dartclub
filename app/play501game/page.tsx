@@ -42,6 +42,7 @@ function Play501GameContent() {
   const [gameMode, setGameMode] = useState<"first-to" | "best-of">("first-to");
   const [gameType, setGameType] = useState<"sets" | "legs">("legs");
   const [target, setTarget] = useState(1);
+  const [startScore, setStartScore] = useState(501);
   const [playerStats, setPlayerStats] = useState<Map<number, DartStats>>(new Map());
   const [showBustPopup, setShowBustPopup] = useState(false);
   const [showInvalidScorePopup, setShowInvalidScorePopup] = useState(false);
@@ -95,6 +96,7 @@ function Play501GameContent() {
     const typeParam = searchParams.get("type");
     const targetParam = searchParams.get("target");
     const trackDoublesParam = searchParams.get("trackDoubles");
+    const startScoreParam = searchParams.get("startScore");
 
     if (playersParam) {
       try {
@@ -111,12 +113,14 @@ function Play501GameContent() {
         setGameType((typeParam as "sets" | "legs") || "legs");
         setTarget(parseInt(targetParam || "1", 10) || 1);
         setTrackDoubles(trackDoublesParam === "true");
+        const parsedStartScore = parseInt(startScoreParam || "501", 10);
+        setStartScore(parsedStartScore === 301 || parsedStartScore === 501 || parsedStartScore === 701 ? parsedStartScore : 501);
 
         // Initialize game states
         const initialStates: PlayerGameState[] = parsedPlayers.map(
           (player: Player) => ({
             player,
-            score: 501,
+            score: parsedStartScore === 301 || parsedStartScore === 501 || parsedStartScore === 701 ? parsedStartScore : 501,
             totalScore: 0,
             totalDarts: 0,
             dartsInCurrentLeg: 0,
@@ -215,7 +219,7 @@ function Play501GameContent() {
       const newLegsWon = currentState.legsWon + 1;
       updatedStatesCopy[currentPlayerIndex] = {
         ...currentState,
-        score: 501, // Reset voor volgende leg
+        score: startScore, // Reset voor volgende leg
         totalScore: currentState.totalScore + score,
         totalDarts: currentState.totalDarts + doubleDarts, // Voeg alleen checkout darts toe (dartsInCurrentLeg zit al in totalDarts)
         dartsInCurrentLeg: 0, // Reset darts voor nieuwe leg
@@ -228,7 +232,7 @@ function Play501GameContent() {
       // totalDarts is al correct bijgewerkt tijdens beurten, behoud het
       updatedStatesCopy.forEach((state, idx) => {
         if (idx !== currentPlayerIndex) {
-          state.score = 501;
+          state.score = startScore;
           // totalDarts blijft zoals het is (al correct bijgewerkt)
           state.dartsInCurrentLeg = 0; // Reset alleen darts voor nieuwe leg
           state.turns = 0;
@@ -395,7 +399,7 @@ function Play501GameContent() {
     const newLegsWon = currentState.legsWon + 1;
     updatedStatesCopy[currentPlayerIndex] = {
       ...currentState,
-      score: 501, // Reset voor volgende leg
+      score: startScore, // Reset voor volgende leg
       totalScore: currentState.totalScore + score,
       totalDarts: currentState.totalDarts + checkoutDarts, // Voeg alleen checkout darts toe (dartsInCurrentLeg zit al in totalDarts)
       dartsInCurrentLeg: 0, // Reset darts voor nieuwe leg
@@ -408,7 +412,7 @@ function Play501GameContent() {
     // totalDarts is al correct bijgewerkt tijdens beurten, behoud het
     updatedStatesCopy.forEach((state, idx) => {
       if (idx !== currentPlayerIndex) {
-        state.score = 501;
+        state.score = startScore;
         // totalDarts blijft zoals het is (al correct bijgewerkt)
         state.dartsInCurrentLeg = 0; // Reset alleen darts voor nieuwe leg
         state.turns = 0; // Reset turns voor nieuwe leg
@@ -920,42 +924,41 @@ function Play501GameContent() {
   }, [showGameFinished, winner]);
 
   const handleUndoTurn = () => {
-    // Ga terug naar de vorige state in de geschiedenis
-    if (gameHistory.length > 0) {
-      const previousState = gameHistory[gameHistory.length - 1];
+    // Gebruik functionele update om de meest recente geschiedenis te krijgen en alles in één keer te verwerken
+    setGameHistory(prev => {
+      // Ga terug naar de vorige state in de geschiedenis
+      if (prev.length > 0) {
+        const previousState = prev[prev.length - 1];
 
-      // Herstel de game states
-      setGameStates(previousState.gameStates);
+        // Controleer of de vorige state het begin van een leg is (alle spelers hebben 0 turns)
+        // Dit betekent dat we proberen de eerste beurt van een leg ongedaan te maken
+        const previousIsNewLeg = previousState.gameStates.every(state => state.turns === 0);
+        
+        // Als de vorige state het begin van een leg is, blokkeer undo (eerste beurt kan niet ongedaan gemaakt worden)
+        if (previousIsNewLeg) {
+          return prev; // Geen wijziging
+        }
 
-      // Herstel de player stats
-      setPlayerStats(previousState.playerStats);
+        // Herstel alle states (React batcht deze updates)
+        setGameStates(previousState.gameStates);
+        setPlayerStats(previousState.playerStats);
+        setCurrentPlayerIndex(previousState.currentPlayerIndex);
+        setLegStartingPlayerIndex(previousState.legStartingPlayerIndex);
+        setSetStartingPlayerIndex(previousState.setStartingPlayerIndex);
+        setInputScore("");
+        setShowDoublePopup(false);
+        setPendingDoubleCheckout(null);
+        setDoubleDarts(null);
+        setShowGameFinished(false);
+        setWinner(null);
 
-      // Herstel de current player index
-      setCurrentPlayerIndex(previousState.currentPlayerIndex);
-
-      // Herstel de starting player indices
-      setLegStartingPlayerIndex(previousState.legStartingPlayerIndex);
-      setSetStartingPlayerIndex(previousState.setStartingPlayerIndex);
-
-      // Verwijder de laatste entry uit de geschiedenis
-      setGameHistory(gameHistory.slice(0, -1));
-
-      // Reset input en popups
-      setInputScore("");
-      setShowDoublePopup(false);
-      setPendingDoubleCheckout(null);
-      setDoubleDarts(null);
-      setShowGameFinished(false);
-      setWinner(null);
-    } else {
-      // Geen geschiedenis, ga gewoon terug naar vorige speler
-      if (currentPlayerIndex > 0) {
-        setCurrentPlayerIndex(currentPlayerIndex - 1);
+        // Verwijder de laatste entry uit de geschiedenis
+        return prev.slice(0, -1);
       } else {
-        setCurrentPlayerIndex(players.length - 1);
+        // Geen geschiedenis beschikbaar
+        return prev;
       }
-      setInputScore("");
-    }
+    });
   };
 
   const handleMenu = () => {
@@ -985,7 +988,7 @@ function Play501GameContent() {
         const state = gameStates.find(s => s.player.id === player.id);
         return state || {
           player,
-          score: 501,
+          score: startScore,
           totalScore: 0,
           totalDarts: 0,
           dartsInCurrentLeg: 0,
@@ -1899,10 +1902,10 @@ function Play501GameContent() {
             <div className="flex rounded-2xl overflow-hidden relative">
               {/* Speler 1 - Links */}
               <div
-                className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+                className={`flex-1 p-4 transition-all duration-200 relative bg-[#28C7D8] ${currentPlayerIndex === 0 ? "scale-105 z-20" : ""} ${currentPlayerIndex === 1 ? "shadow-[10px_0_30px_rgba(255,255,255,1)] z-10" : ""
                   }`}
               >
-                <div className="relative z-10 h-full flex flex-col items-center justify-center">
+                <div className={`relative z-10 h-full flex flex-col items-center justify-center ${currentPlayerIndex !== 0 ? "opacity-80" : ""}`}>
                   {/* Naam bovenaan gecentreerd */}
                   <div className="font-semibold text-xl mb-4 text-white text-center flex items-center justify-center gap-2">
                     {0 === legStartingPlayerIndex && (
@@ -1938,8 +1941,16 @@ function Play501GameContent() {
                       )}
                     </div>
                     {/* Score */}
-                    <div className="text-4xl font-bold text-white ml-2">
-                      {gameStates[0].score}
+                    <div className="flex flex-col items-center ml-2">
+                      <div className="text-4xl font-bold text-white">
+                        {gameStates[0].score}
+                      </div>
+                      {currentPlayerIndex === 0 && (
+                        <div
+                          className="h-1.5 mt-2 bg-white animate-underline-expand animate-underline-pulse"
+                          style={{ width: "100%" }}
+                        />
+                      )}
                     </div>
                   </div>
                   {/* Statistieken onderin gecentreerd */}
@@ -1953,10 +1964,10 @@ function Play501GameContent() {
 
               {/* Speler 2 - Rechts */}
               <div
-                className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 shadow-[0_0_25px_rgba(255,255,255,0.9)]" : ""
+                className={`flex-1 p-4 transition-all duration-200 relative bg-[#EEEEEE] ${currentPlayerIndex === 1 ? "scale-105 z-20" : ""} ${currentPlayerIndex === 0 ? "shadow-[-10px_0_30px_rgba(10,41,79,1)] z-10" : ""
                   }`}
               >
-                <div className="relative z-10 h-full flex flex-col items-center justify-center">
+                <div className={`relative z-10 h-full flex flex-col items-center justify-center ${currentPlayerIndex !== 1 ? "opacity-80" : ""}`}>
                   {/* Naam bovenaan gecentreerd */}
                   <div className="font-semibold text-xl mb-4 text-[#000000] text-center flex items-center justify-center gap-2">
                     {1 === legStartingPlayerIndex && (
@@ -1992,8 +2003,16 @@ function Play501GameContent() {
                       )}
                     </div>
                     {/* Score */}
-                    <div className="text-4xl font-bold text-[#000000] ml-2">
-                      {gameStates[1].score}
+                    <div className="flex flex-col items-center ml-2">
+                      <div className="text-4xl font-bold text-[#000000]">
+                        {gameStates[1].score}
+                      </div>
+                      {currentPlayerIndex === 1 && (
+                        <div
+                          className="h-1.5 mt-2 bg-[#0A294F] animate-underline-expand animate-underline-pulse"
+                          style={{ width: "100%" }}
+                        />
+                      )}
                     </div>
                   </div>
                   {/* Statistieken onderin gecentreerd */}
@@ -2010,19 +2029,32 @@ function Play501GameContent() {
       ) : (
         <div className="grid grid-cols-12 mb-6">
           <div className="col-span-12 md:col-span-8 md:col-start-3 space-y-2">
-            {gameStates.map((state, index) => (
+            {gameStates.map((state, index) => {
+              const isCurrentPlayer = index === currentPlayerIndex;
+              const isBlue = index % 2 === 0;
+              const nextIndex = (index + 1) % gameStates.length;
+              const prevIndex = (index - 1 + gameStates.length) % gameStates.length;
+              
+              // Als blauw aan de beurt is, geef de volgende (witte) speler een blauwe shadow
+              // Als wit aan de beurt is, geef de vorige (blauwe) speler een witte shadow
+              const shouldHaveBlueShadow = !isCurrentPlayer && currentPlayerIndex !== undefined && 
+                gameStates[currentPlayerIndex] && currentPlayerIndex % 2 === 0 && index === nextIndex;
+              const shouldHaveWhiteShadow = !isCurrentPlayer && currentPlayerIndex !== undefined && 
+                gameStates[currentPlayerIndex] && currentPlayerIndex % 2 === 1 && index === prevIndex;
+              
+              return (
               <div
                 key={state.player.id}
-                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${index === currentPlayerIndex
-                  ? index % 2 === 0
-                    ? "bg-[#28C7D8] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-[1.02] sm:scale-100"
-                    : "bg-[#EEEEEE] ring-4 ring-white shadow-[0_0_25px_rgba(255,255,255,0.9)] scale-[1.02] sm:scale-100"
-                  : index % 2 === 0
+                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${isCurrentPlayer
+                  ? isBlue
+                    ? "bg-[#28C7D8] scale-[1.02] sm:scale-100 z-20"
+                    : "bg-[#EEEEEE] scale-[1.02] sm:scale-100 z-20"
+                  : isBlue
                     ? "bg-[#28C7D8]"
                     : "bg-[#EEEEEE]"
-                  }`}
+                  } ${shouldHaveBlueShadow ? "shadow-[0_0_40px_rgba(10,41,79,1)]" : ""} ${shouldHaveWhiteShadow ? "shadow-[0_0_40px_rgba(255,255,255,1)]" : ""}`}
               >
-                <div className="flex items-center gap-3 flex-1">
+                <div className={`flex items-center gap-3 flex-1 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
                   {index === legStartingPlayerIndex && (
                     <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
                       }`} />
@@ -2057,7 +2089,7 @@ function Play501GameContent() {
                     3-dart avg: {calculateAverage(state)}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className={`flex items-center gap-4 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
                   <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
                     }`}>
                     {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
@@ -2075,15 +2107,25 @@ function Play501GameContent() {
                       </div>
                     )}
                   </div>
-                  <div
-                    className={`text-xl font-bold ml-2 ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                      }`}
-                  >
-                    {state.score}
+                  <div className="flex flex-col items-end ml-2">
+                    <div
+                      className={`text-xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                        }`}
+                    >
+                      {state.score}
+                    </div>
+                    {isCurrentPlayer && (
+                      <div
+                        className={`h-1 mt-1.5 ${index % 2 === 0 ? "bg-white" : "bg-[#0A294F]"
+                          } animate-underline-expand animate-underline-pulse`}
+                        style={{ width: "100%" }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -2098,7 +2140,7 @@ function Play501GameContent() {
       </div>
 
       {/* Huidige invoer balkje */}
-      <div className="grid grid-cols-12 mb-6">
+      <div className="grid grid-cols-12 mb-5">
         <div className="col-span-12 md:col-span-8 md:col-start-3">
           <div className="bg-[#EEEEEE] rounded-lg px-6 py-4 w-full">
             <span className="text-5xl font-bold text-[#000000] text-left block">
@@ -2109,8 +2151,9 @@ function Play501GameContent() {
       </div>
 
       {/* Numpad */}
-      <div className="flex-1 flex flex-col justify-end">
-        <div className="grid grid-cols-4 gap-3 max-w-md mx-auto w-full">
+      <div className="grid grid-cols-12">
+        <div className="col-span-12 md:col-span-8 md:col-start-3">
+          <div className="grid grid-cols-4 gap-3 max-w-md mx-auto w-full">
           {/* Rij 1: 1, 2, 3, backspace */}
           <button
             onClick={() => handleNumberClick(1)}
@@ -2243,6 +2286,7 @@ function Play501GameContent() {
           >
             Menu
           </button>
+          </div>
         </div>
       </div>
 

@@ -95,6 +95,31 @@ body {
   }
 }
 
+@keyframes underlineExpand {
+  0% {
+    width: 0;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 1;
+  }
+}
+
+@keyframes underlinePulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scaleX(0.98);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
@@ -121,4 +146,12 @@ body {
 
 .animate-pulse-slow {
   animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-underline-expand {
+  animation: underlineExpand 1.2s ease-out forwards;
+}
+
+.animate-underline-pulse {
+  animation: underlinePulse 3s ease-in-out infinite;
 }

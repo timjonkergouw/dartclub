@@ -9,6 +9,7 @@ export default function Speel501() {
   const [firstToBestOf, setFirstToBestOf] = useState<"first-to" | "best-of">("first-to");
   const [setsLegs, setSetsLegs] = useState<"sets" | "legs">("sets");
   const [counter, setCounter] = useState(1);
+  const [startScore, setStartScore] = useState<301 | 501 | 701>(501);
   const [name, setName] = useState("");
   const [profiles, setProfiles] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -419,6 +420,40 @@ export default function Speel501() {
               SPELINSTELLINGEN
             </div>
           </div>
+
+          {/* Start Score knoppen */}
+          <div className="mb-3">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStartScore(301)}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-base font-semibold transition-all duration-200 ${startScore === 301
+                  ? "bg-[#0A294F] text-[#E8F0FF]"
+                  : "bg-transparent text-[#000000] hover:bg-[#28C7D8]"
+                  }`}
+              >
+                301
+              </button>
+              <button
+                onClick={() => setStartScore(501)}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-base font-semibold transition-all duration-200 ${startScore === 501
+                  ? "bg-[#0A294F] text-[#E8F0FF]"
+                  : "bg-transparent text-[#000000] hover:bg-[#28C7D8]"
+                  }`}
+              >
+                501
+              </button>
+              <button
+                onClick={() => setStartScore(701)}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-base font-semibold transition-all duration-200 ${startScore === 701
+                  ? "bg-[#0A294F] text-[#E8F0FF]"
+                  : "bg-transparent text-[#000000] hover:bg-[#28C7D8]"
+                  }`}
+              >
+                701
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             {/* Links: First to / Best of */}
             <div className="flex-1">
@@ -537,7 +572,7 @@ export default function Speel501() {
           <Link
             href={`/play501game?players=${encodeURIComponent(
               JSON.stringify(selectedPlayers)
-            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=false`}
+            )}&mode=${firstToBestOf}&type=${setsLegs}&target=${counter}&trackDoubles=false&startScore=${startScore}`}
             className="block w-full bg-[#28C7D8] text-white py-4 px-6 rounded-2xl shadow-md font-semibold text-lg text-center hover:bg-[#22a8b7] active:scale-95 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl touch-manipulation"
           >
             Start Game
