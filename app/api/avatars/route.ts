@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
-
-const AVATAR_DIR = path.join(process.cwd(), "public", "avatars");
+import { uploadAvatar } from "@/lib/database";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,17 +25,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await fs.mkdir(AVATAR_DIR, { recursive: true });
     const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(path.join(AVATAR_DIR, filename), buffer);
+    const url = await uploadAvatar(file, filename);
 
-    return NextResponse.json({ url: `/avatars/${filename}` });
+    return NextResponse.json({ url });
   } catch (error) {
     console.error("POST /api/avatars:", error);
-    return NextResponse.json(
-      { error: "Upload mislukt" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Upload mislukt";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

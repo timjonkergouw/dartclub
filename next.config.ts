@@ -11,7 +11,18 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 2,
   },
   // Reduce file system operations during development
-  experimental: {},
+  experimental: {
+    optimizePackageImports: ["@supabase/supabase-js"],
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
   // Turbopack configuration to prevent ENOENT errors (moved from experimental.turbo)
   turbopack: {
     resolveAlias: {},

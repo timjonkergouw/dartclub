@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   deleteProfile,
   getProfileByUsername,
+  getProfiles,
+  isDefaultPlayer,
   updateProfile,
 } from "@/lib/database";
 
@@ -16,6 +18,24 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const body = await request.json();
+    const profiles = await getProfiles();
+    const current = profiles.find((p) => p.id === id);
+
+    if (!current) {
+      return NextResponse.json({ error: "Profiel niet gevonden" }, { status: 404 });
+    }
+
+    if (
+      isDefaultPlayer(current.username) &&
+      body.username &&
+      body.username.trim() !== current.username
+    ) {
+      return NextResponse.json(
+        { error: "De naam van Tim en Jeroen kan niet worden gewijzigd." },
+        { status: 403 }
+      );
+    }
+
     if (body.username) {
       const existing = await getProfileByUsername(body.username, id);
       if (existing) {
@@ -51,10 +71,21 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Ongeldig id" }, { status: 400 });
     }
 
-    const ok = await deleteProfile(id);
-    if (!ok) {
+    const profiles = await getProfiles();
+    const profile = profiles.find((p) => p.id === id);
+
+    if (!profile) {
       return NextResponse.json({ error: "Profiel niet gevonden" }, { status: 404 });
     }
+
+    if (isDefaultPlayer(profile.username)) {
+      return NextResponse.json(
+        { error: "Tim en Jeroen kunnen niet worden verwijderd." },
+        { status: 403 }
+      );
+    }
+
+    await deleteProfile(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/profiles/[id]:", error);
