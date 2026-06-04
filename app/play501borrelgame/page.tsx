@@ -11,7 +11,7 @@ import {
   calculateFinalStats,
   type DartStats,
 } from "@/lib/dartlogic";
-import { supabase } from "@/lib/supabase";
+import { createDartStat, createGame, dartStatExists } from "@/lib/api";
 import { calculateCheckoutInfo } from "@/lib/checkout";
 
 interface Player {
@@ -921,29 +921,18 @@ function Play501GameContent() {
     finishGameLockRef.current = true;
 
     try {
-      // Maak eerst een game record aan in de games tabel
-      const { data: gameData, error: gameError } = await supabase
-        .from("games")
-        .insert({
-          profile_id: finalStates[0]?.player.id, // Gebruik eerste speler als game owner
-          ended_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (gameError) {
-        console.error("Error creating game record:", {
-          code: gameError.code,
-          message: gameError.message,
-          details: gameError.details,
-          hint: gameError.hint,
-        });
-        // Reset lock bij error
+      let gameUuid: string;
+      try {
+        const gameData = await createGame(
+          finalStates[0]?.player.id,
+          new Date().toISOString()
+        );
+        gameUuid = gameData.id;
+      } catch (gameError) {
+        console.error("Error creating game record:", gameError);
         finishGameLockRef.current = false;
         return;
       }
-
-      const gameUuid = gameData.id;
 
       // Sla game UUID op om dubbele aanroep te voorkomen
       finishGameRef.current = gameUuid;
@@ -982,33 +971,15 @@ function Play501GameContent() {
           }
         });
 
-        // Check eerst of er al een record bestaat voor deze game_id en player_id
-        const { data: existingData, error: checkError } = await supabase
-          .from("dart_stats")
-          .select("id")
-          .eq("game_id", gameUuid)
-          .eq("player_id", state.player.id)
-          .maybeSingle();
-
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error(`❌ Error checking existing stats for player ${state.player.id}:`, checkError);
-        }
-
-        // Als er al een record bestaat, skip insert
-        if (existingData) {
+        if (await dartStatExists(gameUuid, state.player.id)) {
           return;
         }
 
-        const { data, error } = await supabase.from("dart_stats").insert(insertData).select();
-
-        if (error) {
-          console.error(`❌ Error saving stats for player ${state.player.id}:`);
-          console.error(`   Code:`, error.code);
-          console.error(`   Message:`, error.message);
-          console.error(`   Details:`, error.details);
-          console.error(`   Hint:`, error.hint);
-          console.error(`   Insert Data:`, JSON.stringify(insertData, null, 2));
-        } else {
+        try {
+          await createDartStat(insertData);
+        } catch (error) {
+          console.error(`Error saving stats for player ${state.player.id}:`, error);
+          console.error(`Insert Data:`, JSON.stringify(insertData, null, 2));
         }
       });
 

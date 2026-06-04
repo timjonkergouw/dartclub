@@ -3,39 +3,13 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { fetchDartStatsByPlayer, fetchProfiles, type DartStat } from "@/lib/api";
 
 interface Profile {
   id: string | number;
   username: string;
   avatar_url?: string | null;
   created_at?: string;
-}
-
-interface DartStat {
-  id: string;
-  game_id: string;
-  player_id: string;
-  three_dart_avg: number | null;
-  first9_avg: number | null;
-  finish: number | null;
-  highest_finish: number | null;
-  doubles_hit: number | null;
-  doubles_thrown: number | null;
-  checkout_percentage: number | null;
-  double_percentage: number | null;
-  highest_score: number | null;
-  one_eighties: number | null;
-  scores_140_plus: number | null;
-  scores_100_plus: number | null;
-  scores_80_plus: number | null;
-  total_turns: number | null;
-  total_darts: number | null;
-  leg_darts: number[] | null;
-  best_leg: number | null;
-  worst_leg: number | null;
-  legs_played: number | null;
-  created_at: string;
 }
 
 interface AggregatedStats {
@@ -59,24 +33,15 @@ export default function Statistieken() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchProfiles();
+    loadProfiles();
   }, []);
 
-  const fetchProfiles = async () => {
+  const loadProfiles = async () => {
     if (typeof window === "undefined") return;
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("username", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching profiles:", error);
-        return;
-      }
-      setProfiles(data || []);
+      setProfiles(await fetchProfiles());
     } catch (error) {
       console.error("Error fetching profiles:", error);
     } finally {
@@ -84,22 +49,12 @@ export default function Statistieken() {
     }
   };
 
-  const fetchStats = async (playerId: string | number) => {
+  const loadStats = async (playerId: string | number) => {
     if (typeof window === "undefined") return;
 
     setIsLoadingStats(true);
     try {
-      const { data, error } = await supabase
-        .from("dart_stats")
-        .select("*")
-        .eq("player_id", playerId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching stats:", error);
-        alert("Fout bij ophalen statistieken: " + error.message);
-        return;
-      }
+      const data = await fetchDartStatsByPlayer(playerId);
 
       if (!data || data.length === 0) {
         setStats(null);
@@ -216,7 +171,7 @@ export default function Statistieken() {
   const handleProfileSelect = (profile: Profile) => {
     setSelectedProfile(profile);
     setIsProfileModalOpen(false);
-    fetchStats(profile.id);
+    loadStats(profile.id);
   };
 
   const formatNumber = (num: number | null): string => {

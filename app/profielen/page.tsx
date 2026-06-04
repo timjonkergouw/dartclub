@@ -3,7 +3,14 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import {
+  createProfile,
+  deleteProfile,
+  fetchProfiles,
+  updateProfile,
+  uploadAvatar,
+  usernameExists,
+} from "@/lib/api";
 
 interface Profile {
   id: number;
@@ -26,23 +33,12 @@ export default function Profielen() {
   const [alertMessage, setAlertMessage] = useState<{ message: string; type: "error" | "success" | "info" } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void; onCancel?: () => void } | null>(null);
 
-  const fetchProfiles = async () => {
-    // Only execute on client side
+  const loadProfiles = async () => {
     if (typeof window === "undefined") return;
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("username", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching profiles:", error);
-        setAlertMessage({ message: "Fout bij ophalen profielen: " + error.message, type: "error" });
-        return;
-      }
-      setProfiles(data || []);
+      setProfiles(await fetchProfiles());
     } catch (error) {
       console.error("Error fetching profiles:", error);
       if (error instanceof Error) {
@@ -54,7 +50,7 @@ export default function Profielen() {
   };
 
   useEffect(() => {
-    fetchProfiles();
+    loadProfiles();
   }, []);
 
   const handleAdd = () => {
@@ -123,154 +119,14 @@ export default function Profielen() {
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
-
-          // Eerst halen we alle games op die bij dit profiel horen
-          const { data: gamesData, error: gamesFetchError } = await supabase
-            .from("games")
-            .select("id")
-            .eq("profile_id", profileId);
-
-          if (gamesFetchError) {
-            console.error("Error fetching games:", gamesFetchError);
-            setAlertMessage({ message: "Fout bij ophalen games: " + gamesFetchError.message, type: "error" });
-            return;
-          }
-
-          const gameIds = gamesData?.map(game => game.id) || [];
-          console.log(`Found ${gameIds.length} games for profile:`, profileId);
-
-          // 1. Verwijder eerst alle dart_stats records die verwijzen naar deze games (via game_id)
-          if (gameIds.length > 0) {
-            const { error: statsError, data: statsData } = await supabase
-              .from("dart_stats")
-              .delete()
-              .in("game_id", gameIds)
-              .select();
-
-            if (statsError) {
-              console.error("Error deleting dart_stats by game_id:", {
-                error: statsError,
-                message: statsError.message,
-                details: statsError.details,
-                hint: statsError.hint,
-                code: statsError.code,
-              });
-              // Als het een permission error is, stop dan
-              if (statsError.code === "PGRST301" || statsError.message?.includes("permission denied")) {
-                setAlertMessage({ message: "Geen toestemming om statistieken te verwijderen. Controleer de database policies voor dart_stats.", type: "error" });
-                return;
-              }
-            } else {
-            }
-          }
-
-          // 2. Verwijder ook alle dart_stats records die direct naar dit profiel verwijzen (via player_id)
-          const { error: statsByPlayerError, data: statsByPlayerData } = await supabase
-            .from("dart_stats")
-            .delete()
-            .eq("player_id", profileId)
-            .select();
-
-          if (statsByPlayerError) {
-            console.error("Error deleting dart_stats by player_id:", {
-              error: statsByPlayerError,
-              message: statsByPlayerError.message,
-              details: statsByPlayerError.details,
-              hint: statsByPlayerError.hint,
-              code: statsByPlayerError.code,
-            });
-            // Als het een permission error is, stop dan
-            if (statsByPlayerError.code === "PGRST301" || statsByPlayerError.message?.includes("permission denied")) {
-              setAlertMessage({ message: "Geen toestemming om statistieken te verwijderen. Controleer de database policies voor dart_stats.", type: "error" });
-              return;
-            }
-          } else {
-            console.log(`Deleted ${statsByPlayerData?.length || 0} dart_stats records by player_id:`, profileId);
-          }
-
-          // 3. Nu kunnen we de games verwijderen (alle dart_stats zijn al verwijderd)
-          if (gameIds.length > 0) {
-            const { error: gamesError, data: deletedGamesData } = await supabase
-              .from("games")
-              .delete()
-              .eq("profile_id", profileId)
-              .select();
-
-            if (gamesError) {
-              console.error("Error deleting games:", {
-                error: gamesError,
-                message: gamesError.message,
-                details: gamesError.details,
-                hint: gamesError.hint,
-                code: gamesError.code,
-              });
-              // Als het een permission error is, stop dan
-              if (gamesError.code === "PGRST301" || gamesError.message?.includes("permission denied")) {
-                setAlertMessage({ message: "Geen toestemming om games te verwijderen. Controleer de database policies voor games.", type: "error" });
-                return;
-              }
-            } else {
-            }
-          }
-
-          // 4. Nu verwijderen we het profiel zelf
-          const { data, error } = await supabase
-            .from("profiles")
-            .delete()
-            .eq("id", profileId)
-            .select();
-
-          if (error) {
-            // Log volledige error details
-            const errorDetails = {
-              error: error,
-              message: error.message,
-              details: error.details,
-              hint: error.hint,
-              code: error.code,
-              // Probeer ook de error object zelf te stringify
-              errorString: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-            };
-            console.error("Error deleting profile:", errorDetails);
-
-            let errorMessage = error.message || "Onbekende fout";
-
-            // Check voor specifieke error codes
-            if (error.code === "PGRST301" || error.message?.includes("permission denied") || error.message?.includes("permission")) {
-              errorMessage = "Geen toestemming om profiel te verwijderen. Controleer de database policies voor de profiles tabel.";
-            } else if (error.code === "23503" || error.message?.includes("foreign key") || error.message?.includes("constraint")) {
-              errorMessage = "Dit profiel kan niet worden verwijderd omdat het nog wordt gebruikt in games of statistieken.";
-            } else if (error.code === "PGRST116") {
-              errorMessage = "Profiel niet gevonden.";
-            } else if (error.code === "23505") {
-              errorMessage = "Er is een conflict opgetreden bij het verwijderen.";
-            } else if (!error.message) {
-              // Als er geen message is, probeer details of hint
-              errorMessage = error.details || error.hint || `Error code: ${error.code || "unknown"}`;
-            }
-
-            setAlertMessage({ message: "Fout bij verwijderen profiel: " + errorMessage + "\n\nCheck de console voor meer details.", type: "error" });
-            return;
-          }
-
-
+          await deleteProfile(profileId);
           setAlertMessage({ message: "Profiel succesvol verwijderd!", type: "success" });
-
-          // Refresh profiles list
-          fetchProfiles();
-
-          // Auto-close success message after 2 seconds
-          setTimeout(() => {
-            setAlertMessage(null);
-          }, 2000);
+          loadProfiles();
+          setTimeout(() => setAlertMessage(null), 2000);
         } catch (error) {
-          console.error("Error deleting profile (catch block):", error);
-          let errorMessage = "Onbekende fout";
-          if (error instanceof Error) {
-            errorMessage = error.message;
-          } else if (typeof error === "object" && error !== null) {
-            errorMessage = JSON.stringify(error);
-          }
+          console.error("Error deleting profile:", error);
+          const errorMessage =
+            error instanceof Error ? error.message : "Onbekende fout";
           setAlertMessage({ message: "Fout bij verwijderen profiel: " + errorMessage, type: "error" });
         }
       },
@@ -290,159 +146,60 @@ export default function Profielen() {
     try {
       let avatarUrl: string | null = null;
 
-      // Upload avatar if a new file was selected
       if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `avatars/${fileName}`;
-
-        // Upload to Supabase Storage
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from('profiles')
-          .upload(filePath, avatarFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error("Error uploading avatar:", uploadError);
-          setAlertMessage({ message: "Fout bij uploaden profielfoto: " + uploadError.message, type: "error" });
+        try {
+          avatarUrl = await uploadAvatar(avatarFile);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : "Upload mislukt";
+          setAlertMessage({ message: "Fout bij uploaden profielfoto: " + msg, type: "error" });
           setIsSubmitting(false);
           return;
         }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('profiles')
-          .getPublicUrl(filePath);
-
-        avatarUrl = urlData.publicUrl;
-
-        // If editing and there was an old avatar, delete it
-        if (modalMode === "edit" && editingProfile?.avatar_url) {
-          const oldPath = editingProfile.avatar_url.split('/').slice(-2).join('/');
-          await supabase.storage
-            .from('profiles')
-            .remove([oldPath]);
-        }
       } else if (avatarRemoved) {
-        // Foto is verwijderd - zet op null
         avatarUrl = null;
-
-        // Verwijder oude foto uit Storage als die bestaat
-        if (modalMode === "edit" && editingProfile?.avatar_url) {
-          try {
-            const oldPath = editingProfile.avatar_url.split('/').slice(-2).join('/');
-            const { error: deleteError } = await supabase.storage
-              .from('profiles')
-              .remove([oldPath]);
-
-            if (deleteError) {
-              console.error("Error deleting old avatar:", deleteError);
-              // Ga door, we kunnen nog steeds de database updaten
-            }
-          } catch (error) {
-            console.error("Error deleting avatar:", error);
-          }
-        }
       } else if (modalMode === "edit" && editingProfile) {
-        // Keep existing avatar if no new file was selected and not removed
         avatarUrl = editingProfile.avatar_url || null;
       }
 
       if (modalMode === "add") {
-        // Check for duplicate username
-        const { data: existingProfiles } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", name.trim())
-          .single();
-
-        if (existingProfiles) {
+        if (await usernameExists(name.trim())) {
           setAlertMessage({ message: "Deze gebruikersnaam bestaat al. Kies een andere naam.", type: "error" });
           setIsSubmitting(false);
           return;
         }
 
-        const { error } = await supabase
-          .from("profiles")
-          .insert({
-            username: name.trim(),
-            avatar_url: avatarUrl
-          })
-          .select();
-
-        if (error) {
-          console.error("Error creating profile:", error);
-          let errorMessage = error.message || "Onbekende fout";
-          if (error.code === "23505" || error.message?.includes("duplicate key")) {
-            errorMessage = "Deze gebruikersnaam bestaat al. Kies een andere naam.";
-          }
-          setAlertMessage({ message: "Fout bij aanmaken profiel: " + errorMessage, type: "error" });
-          setIsSubmitting(false);
-          return;
-        }
-
+        await createProfile(name.trim(), avatarUrl);
         setAlertMessage({ message: "Profiel succesvol aangemaakt!", type: "success" });
-
-        // Auto-close modal and success message after 1.5 seconds
         setTimeout(() => {
           setIsModalOpen(false);
           setAlertMessage(null);
         }, 1500);
       } else {
-        // Edit mode
         if (!editingProfile) return;
 
-        // Check for duplicate username (excluding current profile)
-        const { data: existingProfiles } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", name.trim())
-          .neq("id", editingProfile.id)
-          .single();
-
-        if (existingProfiles) {
+        if (await usernameExists(name.trim(), editingProfile.id)) {
           setAlertMessage({ message: "Deze gebruikersnaam bestaat al. Kies een andere naam.", type: "error" });
           setIsSubmitting(false);
           return;
         }
 
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            username: name.trim(),
-            avatar_url: avatarUrl
-          })
-          .eq("id", editingProfile.id);
-
-        if (error) {
-          console.error("Error updating profile:", error);
-          let errorMessage = error.message || "Onbekende fout";
-          if (error.code === "23505" || error.message?.includes("duplicate key")) {
-            errorMessage = "Deze gebruikersnaam bestaat al. Kies een andere naam.";
-          }
-          setAlertMessage({ message: "Fout bij bijwerken profiel: " + errorMessage, type: "error" });
-          setIsSubmitting(false);
-          return;
-        }
-
+        await updateProfile(editingProfile.id, {
+          username: name.trim(),
+          avatar_url: avatarUrl,
+        });
         setAlertMessage({ message: "Profiel succesvol bijgewerkt!", type: "success" });
-
-        // Auto-close modal and success message after 1.5 seconds
         setTimeout(() => {
           setIsModalOpen(false);
           setAlertMessage(null);
         }, 1500);
       }
 
-      // Success - refresh (modal closes automatically)
       setName("");
       setAvatarFile(null);
       setAvatarPreview(null);
       setAvatarRemoved(false);
       setEditingProfile(null);
-      fetchProfiles();
+      loadProfiles();
     } catch (error) {
       console.error("Error saving profile:", error);
       if (error instanceof Error) {

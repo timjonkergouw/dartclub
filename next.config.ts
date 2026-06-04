@@ -11,22 +11,10 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 2,
   },
   // Reduce file system operations during development
-  experimental: {
-    optimizePackageImports: ['@supabase/supabase-js'],
-  },
+  experimental: {},
   // Turbopack configuration to prevent ENOENT errors (moved from experimental.turbo)
   turbopack: {
     resolveAlias: {},
-  },
-  // Allow images from Supabase Storage
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-        pathname: '/storage/v1/object/public/**',
-      },
-    ],
   },
 };
 

@@ -26,7 +26,7 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
   - Spelersprofielen aanmaken, bewerken en verwijderen
   - Profielfoto's uploaden en beheren
   - Avatar ondersteuning met fallback initialen
-  - Supabase Storage integratie
+  - Lokale profielfoto-opslag
 
 ### Statistieken
 - **Uitgebreide statistieken tracking**
@@ -56,10 +56,9 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
 - **Tailwind CSS 4** - Utility-first CSS framework
 
 ### Backend & Database
-- **Supabase** - Backend-as-a-Service
-  - PostgreSQL database voor data opslag
-  - Row Level Security (RLS) voor data beveiliging
-  - Storage voor profielfoto's
+- **Lokale JSON-database** - Opslag in `data/db.json` via Next.js API routes
+  - Profielen, games en dart_stats
+  - Profielfoto's in `public/avatars/`
 
 ### Design
 - **Gilroy Font** - Modern lettertype geladen via CDN
@@ -70,42 +69,20 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
 ### Vereisten
 - Node.js 18+
 - npm of yarn package manager
-- Een Supabase account
-
 ### Stappen
 
 1. Clone de repository en navigeer naar de project folder
 2. Installeer dependencies met `npm install`
-3. Maak een `.env.local` bestand met je Supabase credentials (zie Omgevingsvariabelen)
-4. Start de development server met `npm run dev`
-5. Open de app in je browser op [http://localhost:3000](http://localhost:3000)
+3. Start de development server met `npm run dev`
+4. Open de app in je browser op [http://localhost:3000](http://localhost:3000)
+
+Bij de eerste run wordt automatisch `data/db.json` aangemaakt. Geen externe database of API-keys nodig.
 
 ### Scripts
 - `npm run dev` - Start development server met hot reload
 - `npm run build` - Build voor productie
 - `npm start` - Start productie server (na build)
 - `npm run lint` - Run ESLint voor code kwaliteit checks
-
-## Omgevingsvariabelen
-
-Maak een `.env.local` bestand in de root van je project met de volgende variabelen:
-
-- `NEXT_PUBLIC_SUPABASE_URL` - Je Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Je Supabase anon public key
-
-**Belangrijk**: Voeg `.env.local` toe aan je `.gitignore` om te voorkomen dat je keys in git komen!
-
-### Supabase Setup
-
-1. Maak een Supabase account op [supabase.com](https://supabase.com)
-2. Maak een nieuw project
-3. Maak de database tabellen `profiles`, `games`, en `dart_stats` aan via de SQL Editor
-4. Stel Storage bucket `avatars` in voor profielfoto's
-5. Stel Row Level Security (RLS) policies in:
-   - `profiles`: SELECT, INSERT, UPDATE, DELETE voor public
-   - `games`: INSERT, DELETE voor public
-   - `dart_stats`: INSERT, SELECT voor public
-6. Haal je API keys op via Project Settings > API
 
 ## Gebruik
 
@@ -114,7 +91,7 @@ Maak een `.env.local` bestand in de root van je project met de volgende variabel
 3. **Scores invoeren**: Voer je scores in tijdens het spel
 4. **Statistieken bekijken**: Bekijk je statistieken op de statistieken pagina na het spelen
 
-De app slaat automatisch alle speldata op in Supabase na elk voltooid spel.
+De app slaat automatisch alle speldata lokaal op na elk voltooid spel.
 
 ## Database / Structuur
 
@@ -129,7 +106,7 @@ De app gebruikt drie hoofdtabellen:
 ### Project Structuur
 
 - `app/` - Next.js App Router pagina's en componenten
-- `lib/` - Utility functies (dartlogic, checkout, supabase client)
+- `lib/` - Utility functies (dartlogic, checkout, database, api client)
 - `public/` - Statische bestanden (iconen, afbeeldingen, sounds)
 
 ### Data Flow

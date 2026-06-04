@@ -11,7 +11,7 @@ import {
   calculateFinalStats,
   type DartStats,
 } from "@/lib/dartlogic";
-import { supabase } from "@/lib/supabase";
+import { createDartStat, createGame, dartStatExists } from "@/lib/api";
 import { calculateCheckoutInfo } from "@/lib/checkout";
 
 interface Player {
@@ -792,29 +792,18 @@ function Play501GameContent() {
     finishGameLockRef.current = true;
 
     try {
-      // Maak eerst een game record aan in de games tabel
-      const { data: gameData, error: gameError } = await supabase
-        .from("games")
-        .insert({
-          profile_id: finalStates[0]?.player.id, // Gebruik eerste speler als game owner
-          ended_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (gameError) {
-        console.error("Error creating game record:", {
-          code: gameError.code,
-          message: gameError.message,
-          details: gameError.details,
-          hint: gameError.hint,
-        });
-        // Reset lock bij error
+      let gameUuid: string;
+      try {
+        const gameData = await createGame(
+          finalStates[0]?.player.id,
+          new Date().toISOString()
+        );
+        gameUuid = gameData.id;
+      } catch (gameError) {
+        console.error("Error creating game record:", gameError);
         finishGameLockRef.current = false;
         return;
       }
-
-      const gameUuid = gameData.id;
 
       // Sla game UUID op om dubbele aanroep te voorkomen
       finishGameRef.current = gameUuid;
@@ -853,33 +842,15 @@ function Play501GameContent() {
           }
         });
 
-        // Check eerst of er al een record bestaat voor deze game_id en player_id
-        const { data: existingData, error: checkError } = await supabase
-          .from("dart_stats")
-          .select("id")
-          .eq("game_id", gameUuid)
-          .eq("player_id", state.player.id)
-          .maybeSingle();
-
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error(`❌ Error checking existing stats for player ${state.player.id}:`, checkError);
-        }
-
-        // Als er al een record bestaat, skip insert
-        if (existingData) {
+        if (await dartStatExists(gameUuid, state.player.id)) {
           return;
         }
 
-        const { data, error } = await supabase.from("dart_stats").insert(insertData).select();
-
-        if (error) {
-          console.error(`❌ Error saving stats for player ${state.player.id}:`);
-          console.error(`   Code:`, error.code);
-          console.error(`   Message:`, error.message);
-          console.error(`   Details:`, error.details);
-          console.error(`   Hint:`, error.hint);
-          console.error(`   Insert Data:`, JSON.stringify(insertData, null, 2));
-        } else {
+        try {
+          await createDartStat(insertData);
+        } catch (error) {
+          console.error(`Error saving stats for player ${state.player.id}:`, error);
+          console.error(`Insert Data:`, JSON.stringify(insertData, null, 2));
         }
       });
 
@@ -933,7 +904,7 @@ function Play501GameContent() {
         // Controleer of de vorige state het begin van een leg is (alle spelers hebben 0 turns)
         // Dit betekent dat we proberen de eerste beurt van een leg ongedaan te maken
         const previousIsNewLeg = previousState.gameStates.every(state => state.turns === 0);
-        
+
         // Als de vorige state het begin van een leg is, blokkeer undo (eerste beurt kan niet ongedaan gemaakt worden)
         if (previousIsNewLeg) {
           return prev; // Geen wijziging
@@ -2034,96 +2005,96 @@ function Play501GameContent() {
               const isBlue = index % 2 === 0;
               const nextIndex = (index + 1) % gameStates.length;
               const prevIndex = (index - 1 + gameStates.length) % gameStates.length;
-              
+
               // Als blauw aan de beurt is, geef de volgende (witte) speler een blauwe shadow
               // Als wit aan de beurt is, geef de vorige (blauwe) speler een witte shadow
-              const shouldHaveBlueShadow = !isCurrentPlayer && currentPlayerIndex !== undefined && 
+              const shouldHaveBlueShadow = !isCurrentPlayer && currentPlayerIndex !== undefined &&
                 gameStates[currentPlayerIndex] && currentPlayerIndex % 2 === 0 && index === nextIndex;
-              const shouldHaveWhiteShadow = !isCurrentPlayer && currentPlayerIndex !== undefined && 
+              const shouldHaveWhiteShadow = !isCurrentPlayer && currentPlayerIndex !== undefined &&
                 gameStates[currentPlayerIndex] && currentPlayerIndex % 2 === 1 && index === prevIndex;
-              
+
               return (
-              <div
-                key={state.player.id}
-                className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${isCurrentPlayer
-                  ? isBlue
-                    ? "bg-[#28C7D8] scale-[1.02] sm:scale-100 z-20"
-                    : "bg-[#EEEEEE] scale-[1.02] sm:scale-100 z-20"
-                  : isBlue
-                    ? "bg-[#28C7D8]"
-                    : "bg-[#EEEEEE]"
-                  } ${shouldHaveBlueShadow ? "shadow-[0_0_40px_rgba(10,41,79,1)]" : ""} ${shouldHaveWhiteShadow ? "shadow-[0_0_40px_rgba(255,255,255,1)]" : ""}`}
-              >
-                <div className={`flex items-center gap-3 flex-1 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
-                  {index === legStartingPlayerIndex && (
-                    <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
-                      }`} />
-                  )}
-                  {state.player.avatar_url ? (
-                    <Image
-                      src={state.player.avatar_url}
-                      alt={state.player.username}
-                      width={28}
-                      height={28}
-                      className={`rounded-full object-cover ${players.length > 3 ? "hidden sm:block" : ""}`}
-                      style={{ width: "28px", height: "28px" }}
-                    />
-                  ) : (
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs ${index % 2 === 0 ? "bg-white/20 text-white" : "bg-[#0A294F]/20 text-[#0A294F]"
-                        } ${players.length > 3 ? "hidden sm:flex" : ""}`}
-                    >
-                      {state.player.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div
-                    className={`font-semibold text-base ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                      }`}
-                  >
-                    {state.player.username}
-                  </div>
-                  <div
-                    className={`text-xs ${index % 2 === 0 ? "text-white/80" : "text-[#7E838F]"
-                      }`}
-                  >
-                    3-dart avg: {calculateAverage(state)}
-                  </div>
-                </div>
-                <div className={`flex items-center gap-4 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
-                  <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
-                    }`}>
-                    {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
-                    {gameType === "sets" && (
-                      <div className={players.length > 3 ? "block sm:hidden text-xs" : "hidden"}>
-                        L {state.legsWon} · S {state.setsWon}
+                <div
+                  key={state.player.id}
+                  className={`rounded-xl p-3 flex items-center justify-between transition-all duration-200 relative ${isCurrentPlayer
+                    ? isBlue
+                      ? "bg-[#28C7D8] scale-[1.02] sm:scale-100 z-20"
+                      : "bg-[#EEEEEE] scale-[1.02] sm:scale-100 z-20"
+                    : isBlue
+                      ? "bg-[#28C7D8]"
+                      : "bg-[#EEEEEE]"
+                    } ${shouldHaveBlueShadow ? "shadow-[0_0_40px_rgba(10,41,79,1)]" : ""} ${shouldHaveWhiteShadow ? "shadow-[0_0_40px_rgba(255,255,255,1)]" : ""}`}
+                >
+                  <div className={`flex items-center gap-3 flex-1 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
+                    {index === legStartingPlayerIndex && (
+                      <div className={`w-4 h-4 rounded-full ${index % 2 === 0 ? "bg-white" : "bg-[#28C7D8]"
+                        }`} />
+                    )}
+                    {state.player.avatar_url ? (
+                      <Image
+                        src={state.player.avatar_url}
+                        alt={state.player.username}
+                        width={28}
+                        height={28}
+                        className={`rounded-full object-cover ${players.length > 3 ? "hidden sm:block" : ""}`}
+                        style={{ width: "28px", height: "28px" }}
+                      />
+                    ) : (
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs ${index % 2 === 0 ? "bg-white/20 text-white" : "bg-[#0A294F]/20 text-[#0A294F]"
+                          } ${players.length > 3 ? "hidden sm:flex" : ""}`}
+                      >
+                        {state.player.username.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
-                      L {state.legsWon}
-                    </div>
-                    {gameType === "sets" && (
-                      <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
-                        S {state.setsWon}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end ml-2">
                     <div
-                      className={`text-xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                      className={`font-semibold text-base ${index % 2 === 0 ? "text-white" : "text-[#000000]"
                         }`}
                     >
-                      {state.score}
+                      {state.player.username}
                     </div>
-                    {isCurrentPlayer && (
+                    <div
+                      className={`text-xs ${index % 2 === 0 ? "text-white/80" : "text-[#7E838F]"
+                        }`}
+                    >
+                      3-dart avg: {calculateAverage(state)}
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-4 ${index !== currentPlayerIndex ? "opacity-80" : ""}`}>
+                    <div className={`font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                      }`}>
+                      {/* Op mobile met meer dan 3 spelers: L en S op één regel, anders onder elkaar */}
+                      {gameType === "sets" && (
+                        <div className={players.length > 3 ? "block sm:hidden text-xs" : "hidden"}>
+                          L {state.legsWon} · S {state.setsWon}
+                        </div>
+                      )}
+                      <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
+                        L {state.legsWon}
+                      </div>
+                      {gameType === "sets" && (
+                        <div className={players.length > 3 ? "hidden sm:block text-sm" : "block text-sm"}>
+                          S {state.setsWon}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end ml-2">
                       <div
-                        className={`h-1 mt-1.5 ${index % 2 === 0 ? "bg-white" : "bg-[#0A294F]"
-                          } animate-underline-expand animate-underline-pulse`}
-                        style={{ width: "100%" }}
-                      />
-                    )}
+                        className={`text-xl font-bold ${index % 2 === 0 ? "text-white" : "text-[#000000]"
+                          }`}
+                      >
+                        {state.score}
+                      </div>
+                      {isCurrentPlayer && (
+                        <div
+                          className={`h-1 mt-1.5 ${index % 2 === 0 ? "bg-white" : "bg-[#0A294F]"
+                            } animate-underline-expand animate-underline-pulse`}
+                          style={{ width: "100%" }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
               );
             })}
           </div>
@@ -2154,138 +2125,138 @@ function Play501GameContent() {
       <div className="grid grid-cols-12">
         <div className="col-span-12 md:col-span-8 md:col-start-3">
           <div className="grid grid-cols-4 gap-3 max-w-md mx-auto w-full">
-          {/* Rij 1: 1, 2, 3, backspace */}
-          <button
-            onClick={() => handleNumberClick(1)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            1
-          </button>
-          <button
-            onClick={() => handleNumberClick(2)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            2
-          </button>
-          <button
-            onClick={() => handleNumberClick(3)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            3
-          </button>
-          <button
-            onClick={handleBackspace}
-            className="bg-[#0A294F] text-white text-2xl font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation flex items-center justify-center"
-            style={{ minHeight: "64px" }}
-          >
-            <Image
-              src="/lucide_delete.png"
-              alt="Backspace"
-              width={24}
-              height={24}
-              className="object-contain"
-            />
-          </button>
-
-          {/* Rij 2: 4, 5, 6, check (bovenste deel) */}
-          <button
-            onClick={() => handleNumberClick(4)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            4
-          </button>
-          <button
-            onClick={() => handleNumberClick(5)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            5
-          </button>
-          <button
-            onClick={() => handleNumberClick(6)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            6
-          </button>
-          <button
-            id="submit-score-button"
-            onClick={handleSubmit}
-            className="bg-[#28C7D8] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation row-span-2 flex items-center justify-center"
-            style={{ minHeight: "136px" }}
-          >
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+            {/* Rij 1: 1, 2, 3, backspace */}
+            <button
+              onClick={() => handleNumberClick(1)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
             >
-              <path
-                d="M20 6L9 17L4 12"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              1
+            </button>
+            <button
+              onClick={() => handleNumberClick(2)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              2
+            </button>
+            <button
+              onClick={() => handleNumberClick(3)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              3
+            </button>
+            <button
+              onClick={handleBackspace}
+              className="bg-[#0A294F] text-white text-2xl font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation flex items-center justify-center"
+              style={{ minHeight: "64px" }}
+            >
+              <Image
+                src="/lucide_delete.png"
+                alt="Backspace"
+                width={24}
+                height={24}
+                className="object-contain"
               />
-            </svg>
-          </button>
+            </button>
 
-          {/* Rij 3: 7, 8, 9, check (onderste deel) */}
-          <button
-            onClick={() => handleNumberClick(7)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            7
-          </button>
-          <button
-            onClick={() => handleNumberClick(8)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            8
-          </button>
-          <button
-            onClick={() => handleNumberClick(9)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            9
-          </button>
+            {/* Rij 2: 4, 5, 6, check (bovenste deel) */}
+            <button
+              onClick={() => handleNumberClick(4)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              4
+            </button>
+            <button
+              onClick={() => handleNumberClick(5)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              5
+            </button>
+            <button
+              onClick={() => handleNumberClick(6)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              6
+            </button>
+            <button
+              id="submit-score-button"
+              onClick={handleSubmit}
+              className="bg-[#28C7D8] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#22a8b7] active:scale-95 transition-all duration-150 touch-manipulation row-span-2 flex items-center justify-center"
+              style={{ minHeight: "136px" }}
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 6L9 17L4 12"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
 
-          {/* Rij 4: beurt terug (curved arrow), 0, menu */}
-          <button
-            onClick={handleUndoTurn}
-            className="bg-[#0A294F] text-white text-lg font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation flex items-center justify-center"
-            style={{ minHeight: "64px" }}
-          >
-            <Image
-              src="/icon-park-twotone_back.png"
-              alt="Beurt terug"
-              width={24}
-              height={24}
-              className="object-contain"
-            />
-          </button>
-          <button
-            onClick={() => handleNumberClick(0)}
-            className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            0
-          </button>
-          <button
-            onClick={handleMenu}
-            className="bg-[#0A294F] text-white text-lg font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
-            style={{ minHeight: "64px" }}
-          >
-            Menu
-          </button>
+            {/* Rij 3: 7, 8, 9, check (onderste deel) */}
+            <button
+              onClick={() => handleNumberClick(7)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              7
+            </button>
+            <button
+              onClick={() => handleNumberClick(8)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              8
+            </button>
+            <button
+              onClick={() => handleNumberClick(9)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              9
+            </button>
+
+            {/* Rij 4: beurt terug (curved arrow), 0, menu */}
+            <button
+              onClick={handleUndoTurn}
+              className="bg-[#0A294F] text-white text-lg font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation flex items-center justify-center"
+              style={{ minHeight: "64px" }}
+            >
+              <Image
+                src="/icon-park-twotone_back.png"
+                alt="Beurt terug"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
+            </button>
+            <button
+              onClick={() => handleNumberClick(0)}
+              className="bg-[#0A294F] text-white text-2xl font-bold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              0
+            </button>
+            <button
+              onClick={handleMenu}
+              className="bg-[#0A294F] text-white text-lg font-semibold py-4 rounded-lg border-2 border-white hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation"
+              style={{ minHeight: "64px" }}
+            >
+              Menu
+            </button>
           </div>
         </div>
       </div>
