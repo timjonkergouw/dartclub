@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchDartStatsByPlayer, fetchProfiles, type DartStat } from "@/lib/api";
+import { fetchDartStatsByPlayer, type DartStat } from "@/lib/api";
+import { DEMO_PLAYERS } from "@/lib/players";
 
 interface Profile {
   id: string | number;
@@ -31,23 +32,6 @@ export default function Statistieken() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  useEffect(() => {
-    loadProfiles();
-  }, []);
-
-  const loadProfiles = async () => {
-    if (typeof window === "undefined") return;
-
-    setIsLoading(true);
-    try {
-      setProfiles(await fetchProfiles());
-    } catch (error) {
-      console.error("Error fetching profiles:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadStats = async (playerId: string | number) => {
     if (typeof window === "undefined") return;
@@ -173,6 +157,13 @@ export default function Statistieken() {
     setIsProfileModalOpen(false);
     loadStats(profile.id);
   };
+
+  useEffect(() => {
+    setProfiles(DEMO_PLAYERS);
+    setIsLoading(false);
+    setSelectedProfile(DEMO_PLAYERS[0]);
+    loadStats(DEMO_PLAYERS[0].id);
+  }, []);
 
   const formatNumber = (num: number | null): string => {
     if (num === null || num === undefined) return "-";

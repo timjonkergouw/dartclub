@@ -26,7 +26,7 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
   - Spelersprofielen aanmaken, bewerken en verwijderen
   - Profielfoto's uploaden en beheren
   - Avatar ondersteuning met fallback initialen
-  - Gedeelde spelers via Supabase (alle apparaten dezelfde lijst)
+  - Demo spelers Tim en Jeroen (ingebouwd, werkt overal)
 
 ### Statistieken
 - **Uitgebreide statistieken tracking**
@@ -55,11 +55,10 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
 - **TypeScript 5** - Type-safe JavaScript
 - **Tailwind CSS 4** - Utility-first CSS framework
 
-### Backend & Database
-- **Supabase** (aanbevolen) – gedeelde database voor alle apparaten
-- **Lokale JSON fallback** – alleen op dit apparaat als Supabase niet is ingesteld
-  - Profielen, games en dart_stats via Next.js API routes
-  - Profielfoto's in Supabase Storage of lokaal in `public/avatars/`
+### Demo modus
+- Geen database of backend nodig
+- Tim en Jeroen zijn ingebouwd in de app (zichtbaar op Vercel, localhost, mobile)
+- Statistieken tonen voorbeelddata voor de demo
 
 ### Design
 - **Gilroy Font** - Modern lettertype geladen via CDN
@@ -74,24 +73,8 @@ Een moderne, mobile-first dart app gebouwd met Next.js voor het spelen van 501 e
 
 1. Clone de repository en navigeer naar de project folder
 2. Installeer dependencies met `npm install`
-3. Configureer Supabase (zie hieronder) voor gedeelde spelers op alle apparaten
-4. Start lokaal met `npm run dev` of deploy naar Vercel
-5. Open de app op **dezelfde URL** op elk apparaat (bijv. `https://jouw-app.vercel.app`)
-
-### Gedeelde spelers op alle apparaten
-
-Om spelers op telefoon, tablet en laptop te delen:
-
-1. Maak een gratis project op [supabase.com](https://supabase.com)
-2. Voer `supabase/schema.sql` uit in **SQL Editor**
-3. Maak een **public** Storage bucket aan met naam `profiles`
-4. Kopieer `.env.example` naar `.env.local` en vul in:
-   - `NEXT_PUBLIC_SUPABASE_URL` – Project URL (Settings > API)
-   - `SUPABASE_SERVICE_ROLE_KEY` – service role key (Settings > API, **niet** delen of committen)
-5. Deploy de app (bijv. Vercel) en voeg dezelfde env-variabelen toe in het hosting-dashboard
-6. Iedereen opent de **ge-deployde URL** – niet `localhost` op verschillende telefoons
-
-Zonder Supabase-variabelen werkt de app alleen lokaal op één machine (`data/db.json`).
+3. Start lokaal met `npm run dev` of push naar Vercel
+4. Open de app — Tim en Jeroen staan klaar om direct te spelen
 
 ### Scripts
 - `npm run dev` - Start development server met hot reload
@@ -106,7 +89,7 @@ Zonder Supabase-variabelen werkt de app alleen lokaal op één machine (`data/db
 3. **Scores invoeren**: Voer je scores in tijdens het spel
 4. **Statistieken bekijken**: Bekijk je statistieken op de statistieken pagina na het spelen
 
-De app slaat speldata op in Supabase (of lokaal als fallback) na elk voltooid spel.
+In demo modus worden spelresultaten niet opgeslagen; statistieken tonen voorbeelddata.
 
 ## Database / Structuur
 
@@ -121,7 +104,7 @@ De app gebruikt drie hoofdtabellen:
 ### Project Structuur
 
 - `app/` - Next.js App Router pagina's en componenten
-- `lib/` - Utility functies (dartlogic, checkout, database, api client)
+- `lib/` - Utility functies (dartlogic, checkout, players)
 - `public/` - Statische bestanden (iconen, afbeeldingen, sounds)
 
 ### Data Flow

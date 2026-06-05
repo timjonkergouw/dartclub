@@ -1,22 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { createProfile, fetchProfiles } from "@/lib/api";
+import { DEMO_PLAYERS, type Profile } from "@/lib/players";
 
 export default function Speel501Borrelmodus() {
   const [firstToBestOf, setFirstToBestOf] = useState<"first-to" | "best-of">("first-to");
   const [setsLegs, setSetsLegs] = useState<"sets" | "legs">("sets");
   const [counter, setCounter] = useState(1);
   const [startScore, setStartScore] = useState<301 | 501 | 701>(501);
-  const [name, setName] = useState("");
-  const [profiles, setProfiles] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const profiles = DEMO_PLAYERS;
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"select" | "create">("select");
-  const [selectedPlayers, setSelectedPlayers] = useState<{ id: number; username: string; avatar_url?: string | null }[]>([]);
-  const [playerDifficulties, setPlayerDifficulties] = useState<Map<number, "easy" | "medium" | "hard" | "extreme">>(new Map());
+  const [selectedPlayers, setSelectedPlayers] = useState<Profile[]>(DEMO_PLAYERS);
+  const [playerDifficulties, setPlayerDifficulties] = useState<Map<number, "easy" | "medium" | "hard" | "extreme">>(
+    new Map(DEMO_PLAYERS.map((p) => [p.id, "medium" as const]))
+  );
   const [sipMultiplier, setSipMultiplier] = useState(1);
 
   const incrementCounter = () => {
@@ -29,37 +28,11 @@ export default function Speel501Borrelmodus() {
     }
   };
 
-  const handleCreateProfile = async () => {
-    if (!name.trim()) {
-      alert("Voer een naam in");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const profile = await createProfile(name.trim());
-      setSelectedPlayers([...selectedPlayers, profile]);
-      setPlayerDifficulties((prev) => new Map(prev).set(profile.id, "medium"));
-      setName("");
-      loadProfiles();
-      setModalMode("select");
-      setIsModalOpen(false);
-    } catch (error: unknown) {
-      console.error("Error creating profile:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Onbekende fout";
-      alert(`Er is een fout opgetreden bij het aanmaken van het profiel:\n${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const selectPlayer = (player: { id: number; username: string; avatar_url?: string | null }) => {
+  const selectPlayer = (player: Profile) => {
     if (!selectedPlayers.find((p) => p.id === player.id)) {
       setSelectedPlayers([...selectedPlayers, player]);
-      // Set default difficulty to "medium" for new player
-      setPlayerDifficulties(prev => new Map(prev).set(player.id, "medium"));
+      setPlayerDifficulties((prev) => new Map(prev).set(player.id, "medium"));
     }
-    setModalMode("select");
   };
 
   const removePlayer = (playerId: number) => {
@@ -71,19 +44,6 @@ export default function Speel501Borrelmodus() {
       return newMap;
     });
   };
-
-  const loadProfiles = async () => {
-    if (typeof window === "undefined") return;
-    try {
-      setProfiles(await fetchProfiles());
-    } catch (error) {
-      console.error("Error fetching profiles:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadProfiles();
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col items-start pt-4 pb-6 px-4 relative z-50">
@@ -205,11 +165,7 @@ export default function Speel501Borrelmodus() {
           {/* Overlay */}
           <div
             className="fixed inset-0 bg-[#0A294F] bg-opacity-40 backdrop-blur-sm z-40 transition-opacity duration-300"
-            onClick={() => {
-              setIsModalOpen(false);
-              setModalMode("select");
-              setName("");
-            }}
+            onClick={() => setIsModalOpen(false)}
           />
 
           {/* Modal */}
@@ -219,116 +175,34 @@ export default function Speel501Borrelmodus() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-[#000000] font-semibold text-xl">
-                  {modalMode === "create" ? "Nieuwe speler" : "Kies speler"}
-                </h2>
+                <h2 className="text-[#000000] font-semibold text-xl">Kies speler</h2>
                 <button
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setModalMode("select");
-                    setName("");
-                  }}
+                  onClick={() => setIsModalOpen(false)}
                   className="w-8 h-8 rounded-full bg-[#0A294F] text-[#E8F0FF] flex items-center justify-center hover:bg-[#0d3a6a] active:scale-95 transition-all"
                 >
                   ×
                 </button>
               </div>
 
-              {modalMode === "select" ? (
-                <>
-                  {/* Keuze buttons */}
-                  <div className="flex gap-3 mb-6">
-                    <button
-                      onClick={() => setModalMode("create")}
-                      className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold text-sm hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150 border-2 border-[#0A294F]"
-                    >
-                      Nieuwe speler
-                    </button>
-                    <button
-                      onClick={() => setModalMode("select")}
-                      className="flex-1 py-3 px-4 bg-[#0A294F] text-[#E8F0FF] rounded-xl font-semibold text-sm hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150"
-                    >
-                      Bestaande speler
-                    </button>
-                  </div>
-
-                  {/* Lijst van bestaande spelers */}
-                  {profiles.length > 0 ? (
-                    <div className="space-y-3">
-                      {profiles.map((profile) => (
-                        <button
-                          key={profile.id}
-                          onClick={() => {
-                            selectPlayer(profile);
-                            setIsModalOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
-                        >
-                          {profile.avatar_url ? (
-                            <Image
-                              src={profile.avatar_url}
-                              alt={profile.username}
-                              width={48}
-                              height={48}
-                              className="rounded-full object-cover shrink-0"
-                              style={{ width: "48px", height: "48px" }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-lg shrink-0">
-                              {profile.username.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <span className="text-[#000000] font-medium text-sm">
-                            {profile.username}
-                          </span>
-                        </button>
-                      ))}
+              <div className="space-y-3">
+                {profiles.map((profile) => (
+                  <button
+                    key={profile.id}
+                    onClick={() => {
+                      selectPlayer(profile);
+                      setIsModalOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#0A294F] flex items-center justify-center text-[#E8F0FF] font-bold text-lg shrink-0">
+                      {profile.username.charAt(0).toUpperCase()}
                     </div>
-                  ) : (
-                    <div className="text-center text-[#7E838F] text-sm py-8">
-                      Geen spelers beschikbaar. Maak eerst een nieuwe speler aan.
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Create mode */}
-                  <div className="space-y-4">
-                    <div>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Naam"
-                        className="w-full px-4 py-3 rounded-xl bg-white text-[#000000] placeholder-[#7E838F] border-2 border-transparent focus:border-[#0A294F] focus:outline-none text-sm"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleCreateProfile();
-                          }
-                        }}
-                        autoFocus
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          setModalMode("select");
-                          setName("");
-                        }}
-                        className="flex-1 py-3 px-4 bg-white text-[#000000] rounded-xl font-semibold text-sm hover:bg-[#D0E0FF] active:scale-95 transition-all duration-150 border-2 border-[#0A294F]"
-                      >
-                        Annuleren
-                      </button>
-                      <button
-                        onClick={handleCreateProfile}
-                        disabled={isLoading || !name.trim()}
-                        className="flex-1 py-3 px-4 bg-[#0A294F] text-[#E8F0FF] rounded-xl font-semibold text-sm hover:bg-[#0d3a6a] active:scale-95 transition-all duration-150 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLoading ? "..." : "Aanmaken"}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+                    <span className="text-[#000000] font-medium text-sm">
+                      {profile.username}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </>

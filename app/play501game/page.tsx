@@ -8,10 +8,8 @@ import {
   createInitialStats,
   registerTurn,
   registerDoubleAttempt,
-  calculateFinalStats,
   type DartStats,
 } from "@/lib/dartlogic";
-import { createDartStat, createGame, dartStatExists } from "@/lib/api";
 import { calculateCheckoutInfo } from "@/lib/checkout";
 
 interface Player {
@@ -772,8 +770,8 @@ function Play501GameContent() {
   const finishGameLockRef = useRef<boolean>(false); // Lock om race conditions te voorkomen
 
   const finishGame = async (
-    finalStates: PlayerGameState[],
-    finalStats: Map<number, DartStats>
+    _finalStates: PlayerGameState[],
+    _finalStats: Map<number, DartStats>
   ) => {
     // Only execute on client side
     if (typeof window === "undefined") return;
@@ -792,74 +790,7 @@ function Play501GameContent() {
     finishGameLockRef.current = true;
 
     try {
-      let gameUuid: string;
-      try {
-        const gameData = await createGame(
-          finalStates[0]?.player.id,
-          new Date().toISOString()
-        );
-        gameUuid = gameData.id;
-      } catch (gameError) {
-        console.error("Error creating game record:", gameError);
-        finishGameLockRef.current = false;
-        return;
-      }
-
-      // Sla game UUID op om dubbele aanroep te voorkomen
-      finishGameRef.current = gameUuid;
-
-      // Helper functie om null/undefined waarden te filteren en NaN te vervangen
-      const cleanValue = (value: unknown): string | number | boolean | null => {
-        if (value === null || value === undefined) return null;
-        if (typeof value === 'number' && isNaN(value)) return null;
-        if (typeof value === 'number' && !isFinite(value)) return null;
-        return value as string | number | boolean;
-      };
-
-      // Save stats for each player
-      const statsPromises = finalStates.map(async (state) => {
-        const playerStat = finalStats.get(state.player.id);
-        if (!playerStat) return;
-
-        // Bereken totale darts: som van alle legDarts of totalDarts * 3 (als legDarts leeg is)
-        const totalDarts = playerStat.legDarts.length > 0
-          ? playerStat.legDarts.reduce((sum, darts) => sum + darts, 0)
-          : state.totalDarts;
-
-        const finalStatsData = calculateFinalStats(playerStat, state.lastScore, totalDarts);
-
-        // Filter null/undefined/NaN waarden en maak insertData object
-        const insertData: Record<string, string | number | boolean | null | number[]> = {
-          game_id: gameUuid,
-          player_id: state.player.id,
-        };
-
-        // Voeg alle stats toe, maar filter null/NaN waarden
-        Object.entries(finalStatsData).forEach(([key, value]) => {
-          const cleanedValue = cleanValue(value);
-          if (cleanedValue !== null) {
-            insertData[key] = cleanedValue;
-          }
-        });
-
-        if (await dartStatExists(gameUuid, state.player.id)) {
-          return;
-        }
-
-        try {
-          await createDartStat(insertData);
-        } catch (error) {
-          console.error(`Error saving stats for player ${state.player.id}:`, error);
-          console.error(`Insert Data:`, JSON.stringify(insertData, null, 2));
-        }
-      });
-
-      await Promise.all(statsPromises);
-    } catch (error) {
-      console.error("Error saving game stats:", error);
-      // Reset lock bij error
-      finishGameLockRef.current = false;
-      finishGameRef.current = null;
+      finishGameRef.current = "demo";
     } finally {
       // Release lock
       finishGameLockRef.current = false;

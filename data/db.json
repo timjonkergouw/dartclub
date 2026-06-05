@@ -1,0 +1,19 @@
+{
+  "profiles": [
+    {
+      "id": 2,
+      "username": "Tim",
+      "avatar_url": "/avatars/1780565466237_u2ri1b09lfh.jpg",
+      "created_at": "2026-06-04T09:31:07.437Z"
+    },
+    {
+      "id": 3,
+      "username": "Jeroen",
+      "avatar_url": "/avatars/1780565503946_0ppnakfk4cmh.png",
+      "created_at": "2026-06-04T09:31:44.890Z"
+    }
+  ],
+  "games": [],
+  "dart_stats": [],
+  "nextProfileId": 4
+}
